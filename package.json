@@ -8,6 +8,7 @@
     "gateway": "node server/gateway.cjs",
     "start:prod": "node server/production.cjs",
     "prod": "node server/production.cjs",
+    "demo": "bash scripts/demo-local-ubuntu.sh",
     "docker:up": "docker compose -f deploy/docker/docker-compose.yml up --build -d",
     "docker:down": "docker compose -f deploy/docker/docker-compose.yml down",
     "package:prod": "node scripts/package-production.mjs",
