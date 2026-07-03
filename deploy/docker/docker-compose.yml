@@ -1,0 +1,43 @@
+# CSI Nora — production Docker Compose (web + LLM gateway)
+#
+# Quick start:
+#   cp deploy/docker/.env.example server/.env   # set provider keys
+#   npm run docker:up
+#
+# Open: http://localhost:8080
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.api
+    env_file:
+      - ../../server/.env
+    environment:
+      PORT: "3456"
+    expose:
+      - "3456"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3456/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.web
+    ports:
+      - "8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

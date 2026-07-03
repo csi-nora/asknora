@@ -1,0 +1,20 @@
+# systemd unit — copy to /etc/systemd/system/csi-nora-gateway.service
+# Adjust WorkingDirectory and EnvironmentFile paths.
+
+[Unit]
+Description=CSI Nora LLM gateway (Node)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/csi-nora
+Environment=NODE_ENV=production
+Environment=PORT=3456
+EnvironmentFile=-/opt/csi-nora/server/.env
+ExecStart=/usr/bin/node server/gateway.cjs
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

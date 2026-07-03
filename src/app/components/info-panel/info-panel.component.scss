@@ -1,0 +1,56 @@
+:host { display: contents; }
+
+.info-panel {
+  border-left: 1px solid var(--border); overflow-y: auto;
+  display: flex; flex-direction: column;
+  &::-webkit-scrollbar { width: 3px; }
+  &::-webkit-scrollbar-thumb { background: var(--border); }
+}
+
+.info-section { padding: 14px; border-bottom: 1px solid var(--border); }
+.info-section-title {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--dim); margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.saved-badge { font-size: 9px; color: var(--accent-green); }
+
+.sec-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 0; font-size: 12px;
+}
+.sec-label { color: var(--muted); }
+.sec-status { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+.context-card {
+  padding: 9px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; margin-bottom: 6px;
+}
+.ctx-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+.ctx-value { font-size: 12px; color: var(--text); font-weight: 500; }
+
+.audit-section { flex: 1; }
+.audit-log { display: flex; flex-direction: column; gap: 6px; }
+.audit-entry {
+  padding: 7px 9px; background: var(--surface); border-radius: 8px;
+  border: 1px solid var(--border); font-size: 11px; line-height: 1.5;
+}
+.audit-time   { color: var(--dim); font-size: 10px; }
+.audit-action { color: var(--text); font-weight: 500; margin-top: 2px; }
+.audit-detail { color: var(--muted); margin-top: 1px; }
+
+.storage-section { border-bottom: none; }
+.stor-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; margin-bottom: 2px;
+}
+
+.storage-breakdown { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.sb-row { display: flex; align-items: center; justify-content: space-between; font-size: 10px; }
+.sb-label { color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.sb-dot   { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.sb-val   { color: var(--dim); font-variant-numeric: tabular-nums; }
+
+.last-saved { font-size: 9px; color: var(--dim); margin-top: 3px; text-align: right; }

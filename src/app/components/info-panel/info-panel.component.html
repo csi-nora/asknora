@@ -1,0 +1,100 @@
+<div class="info-panel">
+
+  <!-- Security Status -->
+  <div class="info-section">
+    <div class="info-section-title">🔐 Security Status</div>
+    <div class="sec-item"><span class="sec-label">IAM Auth</span>
+      <div class="sec-status"><div class="status-dot" style="background:var(--accent-green);box-shadow:0 0 6px rgba(34,197,94,0.5)"></div><span style="color:var(--accent-green)">Active</span></div></div>
+    <div class="sec-item"><span class="sec-label">Role Filter</span>
+      <div class="sec-status"><div class="status-dot" style="background:var(--accent-green);box-shadow:0 0 6px rgba(34,197,94,0.5)"></div><span style="color:var(--accent-green)">{{ state.role() }}</span></div></div>
+    <div class="sec-item"><span class="sec-label">Doc Filter</span>
+      <div class="sec-status"><div class="status-dot" style="background:var(--accent-green);box-shadow:0 0 6px rgba(34,197,94,0.5)"></div><span style="color:var(--accent-green)">On</span></div></div>
+    <div class="sec-item"><span class="sec-label">Output Guard</span>
+      <div class="sec-status"><div class="status-dot" style="background:var(--accent-green);box-shadow:0 0 6px rgba(34,197,94,0.5)"></div><span style="color:var(--accent-green)">Active</span></div></div>
+    <div class="sec-item"><span class="sec-label">Provider</span>
+      <div class="sec-status"><div class="status-dot" [style.background]="provColor()"></div><span [style.color]="'var(--muted)'">{{ provLabel() }}</span></div></div>
+    <div class="sec-item"><span class="sec-label">RAG</span>
+      <div class="sec-status"><div class="status-dot" [style.background]="ragStatus().color"></div><span [style.color]="ragStatus().color">{{ ragStatus().text }}</span></div></div>
+    <div class="sec-item"><span class="sec-label">Mode</span>
+      <div class="sec-status"><div class="status-dot" [style.background]="modeStatusConfig().dot"></div><span [style.color]="modeStatusConfig().color">{{ modeStatusConfig().text }}</span></div></div>
+  </div>
+
+  <!-- Session Context -->
+  <div class="info-section">
+    <div class="info-section-title">📋 Session</div>
+    <div class="context-card"><div class="ctx-label">Sector</div><div class="ctx-value">{{ sectorLabel() }}</div></div>
+    <div class="context-card"><div class="ctx-label">Role</div><div class="ctx-value">{{ state.role() }}</div></div>
+    <div class="context-card"><div class="ctx-label">Model</div><div class="ctx-value">{{ shortModel() }}</div></div>
+    <div class="context-card"><div class="ctx-label">Messages</div><div class="ctx-value">{{ state.msgCount() }}</div></div>
+  </div>
+
+  <!-- Audit Log -->
+  <div class="info-section audit-section">
+    <div class="info-section-title">
+      🧾 Audit Log
+      <button class="btn-sm" (click)="exportAudit()">Export</button>
+    </div>
+    <div class="audit-log">
+      <div class="empty-audit" *ngIf="state.auditEntries.length === 0">No activity yet</div>
+      <div class="audit-entry" *ngFor="let e of state.auditEntries.slice(0, 8); trackBy: trackByTs">
+        <div class="audit-time">{{ e.time }} · {{ e.role }}</div>
+        <div class="audit-action">{{ e.action }}</div>
+        <div class="audit-detail">{{ e.detail }}</div>
+        <span class="audit-sensitivity" [ngClass]="'sens-' + e.sensitivity">{{ e.sensitivity.toUpperCase() }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Storage Status -->
+  <div class="info-section storage-section">
+    <div class="info-section-title">
+      💾 Local Storage
+      <span class="saved-badge" *ngIf="storage.stats$.value.lastSaved">● Saved</span>
+    </div>
+
+    <div class="stor-row">
+      <span style="color:var(--muted)">Used</span>
+      <span style="color:var(--text);font-weight:500">
+        {{ storage.formatBytes(storage.stats$.value.total) }} / 5 MB
+      </span>
+    </div>
+
+    <div class="storage-bar-wrap">
+      <div class="storage-bar" [ngClass]="storBarClass()"
+           [style.width.%]="storage.stats$.value.pct"></div>
+    </div>
+
+    <div class="storage-breakdown">
+      <div class="sb-row">
+        <span class="sb-label"><span class="sb-dot" style="background:var(--accent-blue)"></span>Messages</span>
+        <span class="sb-val">{{ storage.formatBytes(storage.stats$.value.msgSize) }}</span>
+      </div>
+      <div class="sb-row">
+        <span class="sb-label"><span class="sb-dot" style="background:var(--accent-green)"></span>Documents</span>
+        <span class="sb-val">{{ storage.formatBytes(storage.stats$.value.docSize) }}</span>
+      </div>
+      <div class="sb-row">
+        <span class="sb-label"><span class="sb-dot" style="background:var(--accent-amber)"></span>Audit Log</span>
+        <span class="sb-val">{{ storage.formatBytes(storage.stats$.value.auditSize) }}</span>
+      </div>
+      <div class="sb-row">
+        <span class="sb-label"><span class="sb-dot" style="background:var(--accent-purple)"></span>Sessions</span>
+        <span class="sb-val">{{ storage.formatBytes(storage.stats$.value.nsSize) }}</span>
+      </div>
+      <div class="sb-row">
+        <span class="sb-label"><span class="sb-dot" style="background:var(--red)"></span>Chat ref.</span>
+        <span class="sb-val">{{ storage.formatBytes(storage.stats$.value.chatRefSize) }}</span>
+      </div>
+    </div>
+
+    <div class="last-saved">Last saved: {{ lastSavedFmt() }}</div>
+
+    <div class="stor-clear-row">
+      <button class="stor-clear-btn" (click)="clearStorage('messages')">🗨 Msgs</button>
+      <button class="stor-clear-btn" (click)="clearStorage('docs')">📄 Docs</button>
+      <button class="stor-clear-btn" (click)="clearStorage('audit')">🧾 Audit</button>
+      <button class="stor-clear-btn" (click)="clearStorage('all')">🗑 All</button>
+    </div>
+  </div>
+
+</div>

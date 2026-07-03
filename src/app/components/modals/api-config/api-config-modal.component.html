@@ -1,0 +1,102 @@
+<div class="modal-overlay" (click)="close()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">⚙️ AI Provider Configuration</div>
+      <button class="modal-close" (click)="close()">✕</button>
+    </div>
+
+    <!-- Provider tabs -->
+    <div class="prov-tabs">
+      <button class="prov-tab" [class.active]="activeTab() === 'anthropic'" (click)="selectTab('anthropic')">🟠 Anthropic</button>
+      <button class="prov-tab" [class.active]="activeTab() === 'openai'"    (click)="selectTab('openai')">🟢 OpenAI</button>
+      <button class="prov-tab" [class.active]="activeTab() === 'hf'"       (click)="selectTab('hf')">🟡 HuggingFace</button>
+    </div>
+
+    <!-- Anthropic -->
+    <div [class.prov-config]="true" [class.active]="activeTab() === 'anthropic'">
+      <div class="modal-section-title">Anthropic / Claude</div>
+      <div class="form-row">
+        <label class="form-label">API Key</label>
+        <input class="form-input" type="password" [(ngModel)]="keys.anthropic" placeholder="sk-ant-…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Model</label>
+        <div class="model-chips">
+          <button *ngFor="let m of ANTHROPIC_MODELS" class="model-chip"
+            [class.selected]="models.anthropic === m.value"
+            (click)="selectModel('anthropic', m.value)">{{ m.label }}</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Max Tokens</label>
+        <input class="form-input" type="number" [(ngModel)]="maxTokens.anthropic" min="100" max="4000">
+      </div>
+    </div>
+
+    <!-- OpenAI -->
+    <div [class.prov-config]="true" [class.active]="activeTab() === 'openai'">
+      <div class="modal-section-title">OpenAI / ChatGPT</div>
+      <div class="form-row">
+        <label class="form-label">API Key</label>
+        <input class="form-input" type="password" [(ngModel)]="keys.openai" placeholder="sk-…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Model</label>
+        <div class="model-chips">
+          <button *ngFor="let m of OPENAI_MODELS" class="model-chip"
+            [class.selected]="models.openai === m.value"
+            (click)="selectModel('openai', m.value)">{{ m.label }}</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Max Tokens</label>
+        <input class="form-input" type="number" [(ngModel)]="maxTokens.openai" min="100" max="4000">
+      </div>
+    </div>
+
+    <!-- HuggingFace -->
+    <div [class.prov-config]="true" [class.active]="activeTab() === 'hf'">
+      <div class="modal-section-title">HuggingFace Inference API</div>
+      <div class="form-row">
+        <label class="form-label">API Token</label>
+        <input class="form-input" type="password" [(ngModel)]="keys.hf" placeholder="hf_…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Model ID</label>
+        <div class="model-chips">
+          <button *ngFor="let m of HF_MODELS" class="model-chip"
+            [class.selected]="models.hf === m.value"
+            (click)="selectModel('hf', m.value)">{{ m.label }}</button>
+        </div>
+        <input *ngIf="showCustomHf" class="form-input" [(ngModel)]="customHfModel"
+          placeholder="org/model-name" style="margin-top:6px">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Max New Tokens</label>
+        <input class="form-input" type="number" [(ngModel)]="maxTokens.hf" min="100" max="2000">
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="btn-row">
+      <button class="btn-primary" (click)="save()">✓ Save & Activate</button>
+      <button class="btn-secondary" (click)="test()" [disabled]="testStatus() === 'testing'">
+        {{ testStatus() === 'testing' ? '…' : '🔌 Test Connection' }}
+      </button>
+      <button class="btn-secondary" (click)="close()">Cancel</button>
+    </div>
+
+    <!-- Remember keys -->
+    <label class="remember-keys-row">
+      <input type="checkbox" [(ngModel)]="rememberKeys">
+      <span><strong>Remember API keys</strong> in localStorage — stored locally in your browser only. Do not use on shared computers.</span>
+    </label>
+
+    <!-- Test result -->
+    <div *ngIf="testStatus() !== 'idle'" class="test-result"
+         [class.test-ok]="testStatus() === 'ok'"
+         [class.test-fail]="testStatus() === 'fail'">
+      {{ testMessage() }}
+    </div>
+  </div>
+</div>

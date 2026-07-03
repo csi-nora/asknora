@@ -1,0 +1,76 @@
+<div class="sector-panel">
+
+  <!-- Sectors -->
+  <div class="panel-label">Business Sector</div>
+  <button
+    *ngFor="let key of sectorKeys"
+    class="sector-btn"
+    [class.active]="state.sector() === key"
+    (click)="selectSector(key)">
+    <span class="sector-icon">{{ SECTORS[key].icon }}</span>
+    <span class="sector-name">{{ SECTORS[key].name }}</span>
+    <span class="sector-count">{{ SECTORS[key].count }}</span>
+  </button>
+
+  <div class="divider"></div>
+
+  <!-- Sensitivity -->
+  <div class="panel-label">Sensitivity</div>
+  <button
+    *ngFor="let s of sensLevels"
+    class="sector-btn"
+    [class.active]="state.sensitivity() === s.key"
+    (click)="setSensitivity(s.key)">
+    <span class="sector-icon" style="font-size:11px">{{ s.icon }}</span>
+    <span class="sector-name">{{ s.label }}</span>
+  </button>
+
+  <div class="divider"></div>
+
+  <!-- Knowledge Base -->
+  <div class="panel-label kb-label">
+    Knowledge Base
+    <span class="kb-count">{{ kbCount() }}</span>
+  </div>
+
+  <!-- Upload zone -->
+  <div
+    class="upload-zone"
+    [class.dragover]="isDragOver()"
+    (click)="fileInput.click()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave()"
+    (drop)="onDrop($event)">
+    <div class="upload-zone-icon">📄</div>
+    <div class="upload-zone-text">
+      <strong>Drop files or click to upload</strong>
+      PDF · TXT · MD · CSV · HTML
+    </div>
+  </div>
+  <input #fileInput type="file" multiple accept=".pdf,.txt,.md,.csv,.html,.htm" hidden (change)="onFileSelect($event)">
+
+  <!-- Progress bar -->
+  <div class="upload-progress" *ngIf="isUploading()">
+    <div class="upload-progress-bar" [style.width.%]="uploadPct()"></div>
+  </div>
+
+  <!-- Doc list -->
+  <div class="doc-list">
+    <div class="no-docs" *ngIf="state.docs.length === 0">
+      No files uploaded yet
+      <span *ngIf="publicWeb.pageCount() > 0"> — {{ publicWeb.pageCount() }} public page(s) in <code>public-kb.json</code> still apply in chat</span>
+    </div>
+    <div class="doc-item" *ngFor="let doc of state.docs; trackBy: trackById">
+      <span class="doc-icon">{{ docIcon(doc.type) }}</span>
+      <div class="doc-info">
+        <div class="doc-name">{{ doc.name }}</div>
+        <div class="doc-meta">{{ formatSize(doc.size) }} · {{ doc.type.toUpperCase() }}</div>
+        <span class="audit-sensitivity" [ngClass]="'sens-' + doc.sensitivity">
+          {{ doc.sensitivity.toUpperCase() }}
+        </span>
+      </div>
+      <button class="doc-del" (click)="removeDoc(doc.id)" title="Remove">✕</button>
+    </div>
+  </div>
+
+</div>

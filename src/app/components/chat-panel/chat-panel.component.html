@@ -1,0 +1,153 @@
+<div class="chat-panel">
+
+  <!-- Sector Hero -->
+  <div class="sector-hero" *ngIf="sectorData()">
+    <div class="sector-hero-icon">{{ sectorData()!.icon }}</div>
+    <div class="sector-hero-info">
+      <h2>{{ sectorData()!.name }}</h2>
+      <p>{{ sectorData()!.desc }}</p>
+      <div class="service-tags">
+        <span
+          *ngFor="let sv of sectorData()!.services; trackBy: trackByIndex"
+          class="service-tag"
+          [style.color]="sv.color"
+          [style.background]="sv.bg"
+          [style.border-color]="sv.color + '40'">
+          {{ sv.tag }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Knowledge context: scraped public KB + optional uploaded docs -->
+  <div class="rag-bar" [class.hidden]="!ragBarVisible()">
+    📚 <strong>Knowledge context</strong>
+    <ng-container *ngIf="publicWeb.pageCount() > 0">
+      — <strong>{{ publicWeb.pageCount() }}</strong> public page(s) from <code>/public-kb.json</code> (query-matched excerpts)
+    </ng-container>
+    <ng-container *ngIf="state.useRag() && state.docs.length > 0">
+      · <strong>{{ state.docs.length }}</strong> uploaded file(s)
+    </ng-container>
+    <ng-container *ngIf="publicWeb.pageCount() === 0 && (publicWeb.status() === 'missing' || publicWeb.status() === 'error')">
+      — <span class="rag-muted">No public KB — run <code>npm run scrape:public-kb</code> and hard-refresh</span>
+    </ng-container>
+  </div>
+
+  <!-- Mode Bar -->
+  <div class="mode-bar" [ngClass]="modeBarConfig().cls">
+    <span>{{ modeBarConfig().icon }}</span>
+    <span class="mode-bar-text" [innerHTML]="modeBarConfig().text"></span>
+    <button class="recheck-btn" (click)="forceRecheck()">↺ Recheck</button>
+  </div>
+
+  <!-- Messages -->
+  <div class="chat-messages">
+
+    <!-- Info banners -->
+    <div class="info-banner" *ngFor="let b of infoBanners; trackBy: trackById">{{ b.text }}</div>
+
+    <!-- Welcome screen -->
+    <div class="welcome-screen" *ngIf="!sectorData() && messages.length === 0">
+      <div class="welcome-logo">N</div>
+      <h3>Hi, I'm Nora</h3>
+      <p>Singtel CSI enterprise portfolio advisor. Select a sector, upload your documents, and choose your AI provider to get started.</p>
+      <div class="welcome-sectors">
+        <div
+          *ngFor="let chip of welcomeSectorChips; trackBy: trackByIndex"
+          class="ws-chip"
+          (click)="selectSector(chip.key)">
+          {{ chip.label }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat messages -->
+    <ng-container *ngFor="let msg of messages; trackBy: trackByIndex">
+      <!-- System warn -->
+      <div class="restrict-banner" *ngIf="msg.role === 'nora' && msg.content.startsWith('⚠️')">
+        {{ msg.content }}
+      </div>
+
+      <!-- Normal message -->
+      <div class="msg" [ngClass]="msg.role" *ngIf="!(msg.role === 'nora' && msg.content.startsWith('⚠️'))">
+        <div class="msg-avatar">{{ msg.role === 'nora' ? 'N' : '👤' }}</div>
+        <div class="msg-body">
+          <div class="msg-name">
+            {{ msg.role === 'nora' ? 'Nora · ' + provLabel() : (state.role() | titlecase) }}
+          </div>
+          <div class="msg-bubble" [innerHTML]="formatContent(msg.content)"></div>
+
+          <!-- Doc sources -->
+          <div class="msg-source" *ngIf="msg.docSources && msg.docSources.length > 0">
+            📚 Sources:
+            <span *ngFor="let src of msg.docSources; trackBy: trackByIndex" class="src-chip">{{ src }}</span>
+          </div>
+
+          <!-- Mode tag -->
+          <div *ngIf="msg.role === 'nora' && msg.mode">
+            <span class="msg-mode-tag" [ngClass]="'msg-mode-' + msg.mode">
+              {{ modeTagLabel(msg.mode) }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Typing indicator -->
+    <div class="msg nora" *ngIf="state.isLoading()">
+      <div class="msg-avatar">N</div>
+      <div class="msg-body">
+        <div class="msg-name">Nora · {{ provLabel() }}</div>
+        <div class="msg-bubble">
+          <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div #chatBottom></div>
+  </div>
+
+  <!-- Input Area -->
+  <div class="chat-input-area">
+    <!-- Toolbar -->
+    <div class="input-toolbar">
+      <div class="toolbar-item" [class.active]="state.useRag()" (click)="toggleRag()" title="Include uploaded files (left panel) in the prompt. Public web KB from public-kb.json is separate.">
+        📚 Use Docs
+        <span class="rag-toggle-badge" [class.on]="state.useRag()">{{ state.useRag() ? 'ON' : 'OFF' }}</span>
+      </div>
+      <div class="toolbar-item" (click)="state.activeModal.set('portability')">📥 Export Chat</div>
+      <div class="toolbar-item" (click)="copyTranscript()">📋 Copy Transcript</div>
+      <span class="token-count">{{ tokenCount() }}</span>
+    </div>
+
+    <!-- Quick prompts -->
+    <div class="quick-prompts" *ngIf="quickPrompts().length > 0">
+      <button
+        *ngFor="let q of quickPrompts(); trackBy: trackByIndex"
+        class="quick-btn"
+        (click)="quickPrompt(q)">
+        💬 {{ q }}
+      </button>
+    </div>
+
+    <!-- Input row -->
+    <div class="input-row">
+      <div class="input-box" [class.focused]="inputText.length > 0">
+        <textarea
+          #textarea
+          [(ngModel)]="inputText"
+          rows="1"
+          placeholder="Ask Nora about Singtel CSI solutions for your sector…"
+          (keydown)="onKeydown($event)"
+          (input)="autoResize($any($event.target))">
+        </textarea>
+      </div>
+      <button class="send-btn" [disabled]="state.isLoading() || !inputText.trim()" (click)="send()">➤</button>
+    </div>
+  </div>
+
+</div>

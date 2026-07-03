@@ -1,0 +1,28 @@
+# CSI Nora — production web (Angular SPA + nginx reverse proxy to API)
+# Build: docker build -f deploy/docker/Dockerfile.web -t csi-nora-web:latest .
+# Run:   docker run -p 8080:8080 csi-nora-web:latest
+
+FROM node:20-alpine AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY angular.json tsconfig.json tsconfig.spec.json karma.conf.js ./
+COPY src ./src
+COPY public ./public
+
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+COPY deploy/docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist/csi-nora/browser /usr/share/nginx/html
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

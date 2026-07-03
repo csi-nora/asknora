@@ -1,0 +1,43 @@
+<header class="header">
+  <div class="logo-area">
+    <div class="logo-badge">N</div>
+    <div>
+      <div class="logo-text"><span>CSI</span> Nora <span class="version">v4</span></div>
+      <div class="logo-sub">Singtel Enterprise Portfolio Advisor</div>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <!-- Secure badge -->
+    <div class="security-badge">
+      <div class="dot"></div>
+      Secure Session
+    </div>
+
+    <!-- Hybrid mode badge -->
+    <div class="mode-badge" [ngClass]="modeConfig().cls">
+      <div class="mode-dot" [ngClass]="modeConfig().dot"></div>
+      <span>{{ modeConfig().label }}</span>
+    </div>
+
+    <!-- Provider badge -->
+    <button class="provider-badge" (click)="openApiModal()" title="Configure AI Provider">
+      <div class="provider-dot" [style.background]="providerColor()"></div>
+      <span>{{ providerLabel() }}</span>
+      <span class="model-name">{{ shortModel() }}</span>
+      ⚙️
+    </button>
+
+    <!-- Role selector -->
+    <div class="role-selector">
+      👤
+      <select [(ngModel)]="selectedRole">
+        <option *ngFor="let r of roles" [value]="r">{{ r | titlecase }}</option>
+      </select>
+    </div>
+
+    <!-- Action buttons -->
+    <button class="hdr-btn" (click)="openPortabilityModal()">📦 Export / Import</button>
+    <button class="hdr-btn danger" (click)="clearSession()">🗑 Clear</button>
+  </div>
+</header>

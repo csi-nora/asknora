@@ -1,0 +1,97 @@
+<div class="modal-overlay" (click)="close()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">📦 Export & Import</div>
+      <button class="modal-close" (click)="close()">✕</button>
+    </div>
+
+    <!-- Export -->
+    <div class="modal-section">
+      <div class="modal-section-title">Export</div>
+      <div class="export-grid">
+        <div class="export-card" (click)="exportJson()">
+          <div class="export-card-icon">📄</div>
+          <div class="export-card-title">Chat as JSON</div>
+          <div class="export-card-desc">Full session with metadata</div>
+        </div>
+        <div class="export-card" (click)="exportMarkdown()">
+          <div class="export-card-icon">📝</div>
+          <div class="export-card-title">Chat as Markdown</div>
+          <div class="export-card-desc">Readable transcript file</div>
+        </div>
+        <div class="export-card" (click)="exportKb()">
+          <div class="export-card-icon">🗃️</div>
+          <div class="export-card-title">Knowledge Base</div>
+          <div class="export-card-desc">All ingested document text</div>
+        </div>
+        <div class="export-card" (click)="exportAudit()">
+          <div class="export-card-icon">🧾</div>
+          <div class="export-card-title">Audit Log</div>
+          <div class="export-card-desc">CSV compliance export</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import -->
+    <div class="modal-section">
+      <div class="modal-section-title">Import Session</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Load a previously exported JSON session to restore conversation and document context.</p>
+      <div class="btn-row">
+        <button class="btn-primary" (click)="importInput.click()">📂 Choose Session File</button>
+        <input #importInput type="file" accept=".json" hidden (change)="onImportFile($event)">
+      </div>
+    </div>
+
+    <!-- Share link -->
+    <div class="modal-section">
+      <div class="modal-section-title">Share Link (Demo)</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input class="form-input" [value]="shareUrl" readonly style="flex:1;font-size:11px;color:var(--dim)">
+        <button class="btn-secondary" (click)="copyShareUrl()" style="white-space:nowrap;padding:8px 12px;font-size:11px">Copy</button>
+      </div>
+      <p style="font-size:10px;color:var(--dim);margin-top:6px">⚠️ Share links are for demo purposes. Enterprise deployment uses SSO token-based deep links.</p>
+    </div>
+
+    <!-- Named Sessions -->
+    <div class="modal-section">
+      <div class="modal-section-title">💾 Named Sessions (Local Storage)</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Save the current session with a name to resume later — survives page refreshes and browser restarts.</p>
+      <div style="display:flex;gap:6px">
+        <input class="form-input" [(ngModel)]="sessionName" placeholder="Session name (e.g. Healthcare Q2 review)" style="flex:1;font-size:12px">
+        <button class="btn-primary" (click)="saveSession()" style="white-space:nowrap;padding:9px 14px;font-size:12px">💾 Save</button>
+      </div>
+      <div class="named-session-list">
+        <div class="no-sessions" *ngIf="namedSessions().length === 0">No saved sessions yet</div>
+        <div class="ns-item" *ngFor="let s of namedSessions(); trackBy: trackById">
+          <span style="font-size:14px">{{ sectorIcon(s.sector) }}</span>
+          <div style="flex:1;min-width:0">
+            <div class="ns-name">{{ s.name }}</div>
+            <div class="ns-meta">{{ s.msgCount }} msg · {{ s.sector ?? '—' }} · {{ s.savedAt | date:'shortDate' }}</div>
+          </div>
+          <button class="ns-load" (click)="loadSession(s)">↩ Load</button>
+          <button class="ns-del" (click)="deleteSession(s.id)" title="Delete">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Storage Manager -->
+    <div class="modal-section">
+      <div class="modal-section-title">🗃 Storage Manager</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+        <span style="color:var(--muted)">Total Used</span>
+        <span style="color:var(--text);font-weight:600">{{ storage.formatBytes(storage.stats$.value.total) }} / 5 MB</span>
+      </div>
+      <div class="storage-bar-wrap" style="height:7px">
+        <div class="storage-bar" [ngClass]="storBarClass()" [style.width.%]="storage.stats$.value.pct"></div>
+      </div>
+      <div class="stor-clear-row" style="margin-top:10px">
+        <button class="stor-clear-btn" (click)="clearStorage('messages')">Clear Messages</button>
+        <button class="stor-clear-btn" (click)="clearStorage('docs')">Clear Docs</button>
+        <button class="stor-clear-btn" (click)="clearStorage('audit')">Clear Audit</button>
+        <button class="stor-clear-btn" (click)="clearStorage('named')">Clear Sessions</button>
+        <button class="stor-clear-btn danger" (click)="clearStorage('all')">⚠ Clear All</button>
+      </div>
+    </div>
+
+  </div>
+</div>
