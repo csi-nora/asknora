@@ -1,5 +1,6 @@
 import { ApplicationConfig, APP_INITIALIZER } from '@angular/core';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { appRoutes } from './app.routes';
 import { environment } from '../environments/environment';
@@ -11,6 +12,7 @@ import { ExternalStorageService } from './services/external-storage.service';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(appRoutes),
+    provideHttpClient(),
     provideAnimations(),
     { provide: APP_ENVIRONMENT, useValue: environment },
     {
