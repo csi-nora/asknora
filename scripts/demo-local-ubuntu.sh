@@ -67,6 +67,14 @@ if [[ ! -f "$BROWSER_DIST/index.html" ]]; then
   exit 1
 fi
 
+echo ""
+echo "Validating SPA bundles (prevents blank screen)…"
+if ! node scripts/validate-dist.mjs; then
+  echo ""
+  echo "Fix: npm run build   then re-run npm run demo"
+  exit 1
+fi
+
 # Port check
 if command -v ss >/dev/null 2>&1 && ss -tln | grep -q ":${PORT} "; then
   echo ""

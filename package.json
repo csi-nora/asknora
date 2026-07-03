@@ -14,6 +14,8 @@
     "package:prod": "node scripts/package-production.mjs",
     "build:vm": "node scripts/build-for-vm.mjs",
     "build": "ng build --configuration=production",
+    "validate:dist": "node scripts/validate-dist.mjs",
+    "postbuild": "node scripts/validate-dist.mjs",
     "test": "ng test",
     "test:uat": "ng test --no-watch --browsers=ChromeHeadless --include=**/deployment-environment.service.spec.ts --include=**/backend-llm-urls.spec.ts"
   },

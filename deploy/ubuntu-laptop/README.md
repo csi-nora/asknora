@@ -94,6 +94,7 @@ Open **http://localhost:4200** (not 8080).
 | **Port 8080 in use** | `CSI_NORA_DEMO_PORT=8081 npm run demo` |
 | **`node` not found** | Install Node 20 LTS and reopen the terminal. |
 | **Missing `dist/`** | Run `npm run build` (requires full Angular source tree). |
+| **Blank white screen** | Stale `dist/` — `index.html` references JS files that are missing. Run `npm run build` (or `npm run validate:dist` to check). The server now refuses to start if bundles are broken. |
 | **LLM calls fail** | Add keys to `server/.env` and restart `npm run demo`. |
 
 ---

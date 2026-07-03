@@ -20,6 +20,32 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const PORT = Number(process.env.PORT || 8080);
 const ROOT = path.join(__dirname, '..', 'dist', 'csi-nora', 'browser');
 
+function assetRefsFromIndex(html) {
+  const refs = [];
+  const re = /(?:src|href)=["']([^"']+\.(?:js|css))["']/g;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const ref = m[1];
+    if (!ref.startsWith('http')) {
+      refs.push(ref.split('?')[0]);
+    }
+  }
+  return refs;
+}
+
+function validateSpaAssets() {
+  const indexPath = path.join(ROOT, 'index.html');
+  if (!fs.existsSync(indexPath)) {
+    return [`Missing ${indexPath} — run: npm run build`];
+  }
+  const html = fs.readFileSync(indexPath, 'utf8');
+  const missing = assetRefsFromIndex(html).filter((ref) => !fs.existsSync(path.join(ROOT, ref)));
+  if (!/main-[A-Z0-9]+\.js/.test(html)) {
+    missing.push('main-*.js (Angular bootstrap bundle)');
+  }
+  return missing;
+}
+
 function stripClientSecrets(proxyReq) {
   proxyReq.removeHeader('authorization');
   proxyReq.removeHeader('x-api-key');
@@ -98,6 +124,17 @@ function mountStatic(app) {
     console.error(
       `[production] Missing build output: ${ROOT}\n` +
         'Run: npm run build   (or npm run build:prod)',
+    );
+    process.exit(1);
+  }
+
+  const broken = validateSpaAssets();
+  if (broken.length) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[production] Broken SPA build — index.html references missing files:\n` +
+        broken.map((f) => `  - ${f}`).join('\n') +
+        '\n\nThis causes a blank screen in the browser. Rebuild:\n  npm run build\n',
     );
     process.exit(1);
   }
