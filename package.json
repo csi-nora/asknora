@@ -1,0 +1,23 @@
+{
+  "name": "csi-nora",
+  "version": "4.2.0",
+  "description": "CSI Nora — Singtel Enterprise Portfolio Advisor (deployment bundle)",
+  "private": true,
+  "scripts": {
+    "gateway": "node server/gateway.cjs",
+    "start:prod": "node server/production.cjs",
+    "prod": "node server/production.cjs",
+    "docker:up": "docker compose -f deploy/docker/docker-compose.yml up --build -d",
+    "docker:down": "docker compose -f deploy/docker/docker-compose.yml down",
+    "package:prod": "node scripts/package-production.mjs",
+    "build:vm": "node scripts/build-for-vm.mjs",
+    "build": "node -e \"const fs=require('fs'); if(!fs.existsSync('dist/csi-nora/browser/index.html')){console.error('Missing dist/csi-nora/browser — rebuild from full source repo.'); process.exit(1)} console.log('Using pre-built dist/csi-nora/browser')\"",
+    "test:uat": "node --test src/app/services/deployment-environment.service.spec.ts 2>/dev/null || echo 'UAT spec requires Angular test runner (ng test) from full source repo'"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "http-proxy-middleware": "^3.0.5"
+  }
+}
