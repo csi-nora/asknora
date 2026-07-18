@@ -1,0 +1,23 @@
+# GPU overlay — NVIDIA passthrough for Ollama (Linux / WSL2).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+#
+# Prerequisites: nvidia-smi + NVIDIA Container Toolkit (or Docker Desktop GPU).
+
+services:
+  ollama:
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+      OLLAMA_KEEP_ALIVE: 24h
+      OLLAMA_NUM_GPU: "-1"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      ACCEL_DEVICE: gpu
+      ACCEL_BACKEND: cuda
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

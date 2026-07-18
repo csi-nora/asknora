@@ -1,0 +1,11 @@
+# Minimal smoke-test deps (avoids chromadb native build on Windows)
+python-dotenv==1.0.1
+pydantic==2.10.6
+pydantic-settings==2.7.1
+httpx==0.28.1
+redis==5.2.1
+qdrant-client==1.13.2
+psycopg2-binary==2.9.10
+pytest==8.3.4
+ollama==0.4.7
+numpy==2.2.2

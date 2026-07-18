@@ -1,0 +1,12 @@
+bundle: csi-nora-fullstack
+created: 2026-07-16T19:33:59.0222209+05:30
+files: 97
+dirs: 36
+size_mb_uncompressed: 0.74
+includes:
+  - csi-nora-v2 (Angular CSI Nora)
+  - ai-ecosystem-sandbox (Docker AI stack)
+  - docs (runbooks)
+  - bootstrap.ps1 / bootstrap.sh
+excludes:
+  - node_modules, .venv, dist, .env secrets

@@ -1,0 +1,29 @@
+# Heavy / optional packages — install only if you need them
+# pip install -r requirements-optional.txt
+
+# Microsoft Agent Framework (preview — may require separate install steps)
+# agent-framework
+
+# Zep memory (cloud SDK)
+zep-cloud==2.8.0
+
+# Weights & Biases experiment tracking
+wandb==0.19.4
+
+# Apache Airflow / Prefect (large; run separately via Docker if needed)
+# prefect==3.1.11
+
+# NVIDIA NeMo Guardrails (GPU-heavy; use Presidio for lightweight demos)
+# nemoguardrails==0.11.0
+
+# vLLM (requires GPU Linux; not for Windows CPU sandbox)
+# vllm==0.7.2
+
+# GraphRAG (Microsoft — large dependency tree)
+# graphrag==2.2.0
+
+# EmbedChain
+embedchain==0.1.128
+
+# CAMEL / AWS Strands — community wrappers; add when needed
+# camel-ai==0.2.46
