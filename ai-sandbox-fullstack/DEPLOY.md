@@ -142,6 +142,34 @@ relative API paths, so no rebuild is needed for IP access.
 > local LLM via the proxy. Use only on a **trusted** network and stop the stack
 > after the demo (`docker compose ... down`).
 
+## 6C. Auto-start on reboot / persistent deployment
+
+Bring the whole stack back **automatically** after a Windows reboot so
+`http://<LAN-IP>:9090/` is live with no manual steps. Three layers:
+
+1. **Docker restart policy** — every service uses `restart: unless-stopped`, so
+   Docker relaunches all containers once the engine is up.
+2. **Docker Desktop autostart** — enable *Settings → General → "Start Docker
+   Desktop when you sign in"*.
+3. **Scheduled Task fallback** — `scripts/autostart-stack.ps1` runs at logon, waits
+   for `docker info`, then runs the compose `up -d` one-liner (idempotent).
+
+**One-time setup — run ONCE in an elevated / Admin PowerShell:**
+
+```powershell
+cd ai-ecosystem-sandbox
+# creates the LAN firewall rule (TCP 9090) + registers the logon Scheduled Task
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-autostart.ps1 -Port 9090
+```
+
+Then enable **Docker Desktop → Settings → General → "Start Docker Desktop when you
+sign in"** (Apply & Restart). To keep the URL constant, set a **DHCP reservation /
+static IP** for the host (the app binds `0.0.0.0` and follows the DHCP IP).
+
+> WSL2 tradeoff: Docker Desktop needs an interactive user session, so the task runs
+> **at logon**. For a login-free boot, run the Docker engine as a Windows service
+> instead (more setup; optional). Details: `ai-ecosystem-sandbox/reverse-proxy/README.md`.
+
 ## 7. Verify
 
 | Check | Command / URL |
@@ -151,6 +179,9 @@ relative API paths, so no rebuild is needed for IP access.
 | Nora | http://localhost:4200 |
 | Reverse proxy | `curl http://localhost/healthz` (or your `-Port`) |
 | LAN access | `curl http://<LAN-IP>:9090/healthz` (from another host) |
+| Restart policy | `docker inspect -f "{{.HostConfig.RestartPolicy.Name}}" sandbox-proxy` → `unless-stopped` |
+| Autostart task | `Get-ScheduledTask -TaskName "CSI Nora Stack Autostart"` → `Ready` |
+| Firewall rule | `Get-NetFirewallRule -DisplayName "CSI Nora Demo (TCP 9090)"` |
 | Qdrant | `curl http://127.0.0.1:6333/readyz` |
 
 ## Troubleshooting

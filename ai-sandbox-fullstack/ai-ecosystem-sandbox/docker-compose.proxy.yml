@@ -72,6 +72,7 @@ services:
   # Overrides the profiled base service so it starts as part of the app stack.
   streamlit:
     profiles: !reset []
+    restart: unless-stopped
     command:
       - streamlit
       - run

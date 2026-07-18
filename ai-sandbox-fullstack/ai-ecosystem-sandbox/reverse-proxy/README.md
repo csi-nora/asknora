@@ -97,6 +97,71 @@ it works over any host/IP with **no rebuild**. nginx uses `server_name _;` so an
 > the stack after the demo (`docker compose ... down`). Keep Ollama/bridge/DBs on
 > loopback — do not add LAN port bindings for them.
 
+## Auto-start on reboot / persistent deployment
+
+Make the stack come back automatically after a Windows reboot — no manual steps —
+so `http://<LAN-IP>:9090/` is live again on its own.
+
+**How it works (three layers, belt-and-suspenders):**
+
+1. **Docker restart policy** — every service in `docker-compose.yml` /
+   `docker-compose.proxy.yml` has `restart: unless-stopped`, so Docker relaunches
+   all containers automatically as soon as the engine is up.
+2. **Docker Desktop autostart** — enable *Settings → General → "Start Docker
+   Desktop when you sign in"* so the engine comes up at logon (the WSL2 backend
+   needs a user session — see the tradeoff below).
+3. **Scheduled Task fallback** — `scripts/autostart-stack.ps1` runs at logon,
+   loops until `docker info` succeeds, then runs the compose `up -d` one-liner as
+   a guarantee. It is idempotent and logs to `autostart-stack.log`.
+
+### One-time setup (run ONCE in an elevated / Admin PowerShell)
+
+```powershell
+cd <repo>\ai-ecosystem-sandbox
+# creates the LAN firewall rule (TCP 9090) + registers the logon Scheduled Task
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-autostart.ps1 -Port 9090
+```
+
+Then do the one manual GUI step: **Docker Desktop → Settings → General →
+"Start Docker Desktop when you sign in"** (Apply & Restart).
+
+Prefer `schtasks` directly? Equivalent one-liner (Admin shell):
+
+```powershell
+schtasks /create /tn "CSI Nora Stack Autostart" /sc onlogon /rl highest /f `
+  /tr "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"<repo>\ai-ecosystem-sandbox\scripts\autostart-stack.ps1\" -Port 9090"
+```
+
+### Firewall persistence
+
+The inbound firewall rule for TCP 9090 is **permanent** across reboots (it lives in
+the Windows Firewall configuration, not in memory). `setup-autostart.ps1` calls
+`scripts/enable-lan-firewall.ps1`, which creates the rule only if it's missing.
+
+### Keep the LAN URL constant (recommended)
+
+The app binds `0.0.0.0`, so it follows whatever IP the host receives from DHCP. To
+keep `http://192.168.1.32:9090/` stable, set a **DHCP reservation** for this host on
+your router (or assign a static IP). This is a network setting and is **not** changed
+automatically.
+
+### Headless / no-login tradeoff
+
+Docker Desktop's WSL2 backend needs an **interactive user session**, so the task
+triggers **at logon** and the engine starts after you sign in. For a fully headless
+boot (no login at all), run the Docker **engine as a Windows service** instead of
+Docker Desktop (e.g. `wsl --update` + `dockerd`, or Docker CE inside WSL) — more
+setup and not required for the demo. The Scheduled Task + Docker Desktop autostart
+is the practical default.
+
+### Verify (no reboot needed)
+
+```powershell
+docker inspect -f "{{.HostConfig.RestartPolicy.Name}}" sandbox-proxy   # -> unless-stopped
+Get-ScheduledTask -TaskName "CSI Nora Stack Autostart"                  # -> Ready
+Get-NetFirewallRule  -DisplayName "CSI Nora Demo (TCP 9090)"            # -> exists / Enabled
+```
+
 ## Manual commands
 
 ```bash
