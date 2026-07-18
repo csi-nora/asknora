@@ -65,6 +65,12 @@ import { Sensitivity } from '../../models';
     <div class="up-prog-bar" [style.width.%]="upPct()"></div>
   </div>
 
+  <!-- Upload feedback (success / errors — never fail silently) -->
+  <div class="up-msg" [class.err]="feedback()?.err" *ngIf="feedback() as f">
+    <span>{{ f.err ? '⚠️' : '✅' }}</span>
+    <span>{{ f.text }}</span>
+  </div>
+
   <!-- Doc list -->
   <div class="doc-list">
     <div class="no-items" *ngIf="!st.docs.length">No documents ingested yet</div>
@@ -111,6 +117,10 @@ import { Sensitivity } from '../../models';
       &:hover,.dragover{border-color:var(--border-a);background:rgba(224,0,26,.04)}}
     .uz-text{font-size:11px;color:var(--muted);line-height:1.5 strong{color:var(--text);display:block;font-size:12px}}
     .uz-text strong{color:var(--text);display:block;font-size:12px}
+    .up-msg{display:flex;align-items:flex-start;gap:6px;font-size:10px;line-height:1.4;
+      padding:6px 8px;border-radius:8px;margin:2px 0;
+      background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);color:var(--green)}
+    .up-msg.err{background:rgba(224,0,26,.08);border-color:rgba(224,0,26,.3);color:var(--red)}
     .doc-list{display:flex;flex-direction:column;gap:4px}
     .doc-item{display:flex;align-items:flex-start;gap:7px;padding:7px 8px;background:var(--surface);
       border:1px solid var(--border);border-radius:8px;font-size:11px;transition:.15s;
@@ -133,6 +143,7 @@ export class SectorPanelComponent {
   uploading = signal(false);
   upPct     = signal(0);
   over = this._over;
+  feedback = signal<{ text: string; err: boolean } | null>(null);
 
   constructor(
     public st:  StateService,
@@ -161,9 +172,23 @@ export class SectorPanelComponent {
     if (e.dataTransfer?.files) this._ingest(e.dataTransfer.files);
   }
   private async _ingest(files: FileList) {
+    this.feedback.set(null);
     this.uploading.set(true); this.upPct.set(20);
-    await this.docSvc.ingestFiles(files, this.st.sensitivity());
+    let errors: string[] = [];
+    try {
+      errors = await this.docSvc.ingestFiles(files, this.st.sensitivity());
+    } catch (e) {
+      errors = [(e as Error)?.message || 'Unexpected error during ingestion'];
+    }
     this.upPct.set(100);
+    const total = files.length;
+    const ok = total - errors.length;
+    if (errors.length) {
+      this.feedback.set({ text: `${ok}/${total} added — ${errors.join('; ')}`, err: true });
+    } else if (ok > 0) {
+      this.feedback.set({ text: `${ok} document${ok !== 1 ? 's' : ''} added to the knowledge base.`, err: false });
+      setTimeout(() => this.feedback.set(null), 4000);
+    }
     setTimeout(() => { this.uploading.set(false); this.upPct.set(0); }, 500);
   }
   remove(id: string) { this.docSvc.removeDoc(id); }

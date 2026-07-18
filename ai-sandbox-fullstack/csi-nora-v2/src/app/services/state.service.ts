@@ -7,7 +7,9 @@ import {
 import { environment } from '../../environments/environment';
 
 export const DEFAULT_RAG_CONFIG: RagConfig = {
-  mode: 'hybrid', topK: 5, chunkSize: 400, overlap: 60, minScore: 0.05
+  // minScore applies to the fused RRF score (~1/(k+rank)); with k=60 the top hit
+  // is ≈0.033, so the old 0.05 filtered out every chunk. Keep a small noise floor.
+  mode: 'hybrid', topK: 5, chunkSize: 400, overlap: 60, minScore: 0.01
 };
 
 export const DEFAULT_API_CONFIG: ApiConfig = {

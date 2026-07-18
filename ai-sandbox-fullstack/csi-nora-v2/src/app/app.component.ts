@@ -119,7 +119,13 @@ export class AppComponent implements OnInit, OnDestroy {
       if (sess.role)      this.st.role.set(sess.role);
       if (sess.sensitivity) this.st.sensitivity.set(sess.sensitivity);
       if (sess.useRag != null) this.st.useRag.set(sess.useRag);
-      if (sess.ragConfig) this.st.ragConfig.set(sess.ragConfig);
+      if (sess.ragConfig) {
+        // Migrate stale configs: the old default minScore (0.05) is incompatible
+        // with RRF fused scores and silently suppressed all citations.
+        const rc = { ...sess.ragConfig };
+        if (rc.minScore == null || rc.minScore >= 0.05) rc.minScore = 0.01;
+        this.st.ragConfig.set(rc);
+      }
       if (sess.sector && SECTORS[sess.sector]) this.st.sector.set(sess.sector);
       if (sess.messages?.length) this.st.setMessages(sess.messages);
     }

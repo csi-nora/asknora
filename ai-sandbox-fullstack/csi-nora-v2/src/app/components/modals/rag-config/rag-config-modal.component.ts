@@ -51,8 +51,8 @@ import { RagConfig, RagMode } from '../../../models';
     </div>
     <div class="cfg-row">
       <span class="cfg-lbl">Min score threshold</span>
-      <span class="cfg-val">{{ cfg.minScore.toFixed(2) }}</span>
-      <input class="cfg-slider" type="range" [(ngModel)]="cfg.minScore" min="0.01" max="0.5" step="0.01">
+      <span class="cfg-val">{{ cfg.minScore.toFixed(3) }}</span>
+      <input class="cfg-slider" type="range" [(ngModel)]="cfg.minScore" min="0" max="0.05" step="0.005">
     </div>
   </div>
 

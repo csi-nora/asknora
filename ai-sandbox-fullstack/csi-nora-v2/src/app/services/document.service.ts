@@ -17,7 +17,13 @@ export class DocumentService {
     private audit: AuditService,
     private rag:   RagService,
   ) {
-    if (typeof pdfjsLib !== 'undefined') {
+    this._configurePdfWorker();
+  }
+
+  /** Point pdf.js at its web worker. Safe to call repeatedly; no-op if the
+   *  library isn't present yet (we retry lazily right before parsing). */
+  private _configurePdfWorker(): void {
+    if (typeof pdfjsLib !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
       pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
@@ -83,7 +89,10 @@ export class DocumentService {
   }
 
   private async _pdfToText(file: File): Promise<string> {
-    if (typeof pdfjsLib === 'undefined') throw new Error('PDF.js not loaded');
+    if (typeof pdfjsLib === 'undefined') {
+      throw new Error('PDF reader unavailable (pdf.js failed to load — check network/CDN access)');
+    }
+    this._configurePdfWorker();
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
     let text = '';
