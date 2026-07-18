@@ -19,7 +19,9 @@ services:
     container_name: sandbox-proxy
     restart: unless-stopped
     ports:
-      - "${PROXY_HTTP_PORT:-80}:80"
+      # Bind 0.0.0.0 so the demo is reachable from other LAN hosts (http://<LAN-IP>:PORT).
+      # This is the ONLY service intentionally exposed to the LAN. See reverse-proxy/README.md.
+      - "0.0.0.0:${PROXY_HTTP_PORT:-80}:80"
     volumes:
       - ./reverse-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
       # Built Angular SPA (run `npm run build` in ../csi-nora-v2 first)
@@ -46,7 +48,9 @@ services:
     container_name: sandbox-nora-bridge
     restart: unless-stopped
     ports:
-      - "${BRIDGE_HOST_PORT:-8090}:8090"
+      # Loopback only — the bridge is reached via the proxy (/sandbox) on the Docker
+      # network; it must NOT be directly reachable from the LAN.
+      - "127.0.0.1:${BRIDGE_HOST_PORT:-8090}:8090"
     env_file:
       - path: .env
         required: false

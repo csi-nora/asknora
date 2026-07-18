@@ -61,6 +61,42 @@ containers in the same stack.
 .\scripts\start_proxy.ps1 -Mode dev
 ```
 
+## LAN / external access (share the demo with other machines)
+
+The proxy binds `0.0.0.0`, so it is reachable from other hosts on your network.
+**Only the proxy is LAN-exposed** — Ollama, the bridge and the databases bind to
+`127.0.0.1` (loopback) and are reached only through the proxy on the internal
+Docker network, so the local LLM is never directly exposed.
+
+1. Find your LAN IP (Windows):
+   ```powershell
+   ipconfig    # use the IPv4 Address of your active adapter (e.g. Wi-Fi), e.g. 192.168.1.32
+   ```
+2. Allow the port through Windows Firewall (run once, in an **elevated / Admin** prompt):
+   ```powershell
+   netsh advfirewall firewall add rule name="CSI Nora Demo (TCP 9090)" dir=in action=allow protocol=TCP localport=9090
+   ```
+   Remove it after the demo:
+   ```powershell
+   netsh advfirewall firewall delete rule name="CSI Nora Demo (TCP 9090)"
+   ```
+3. Share the URL: **http://<LAN-IP>:9090/**  (e.g. `http://192.168.1.32:9090/`).
+
+Verify the binding:
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml ps
+netstat -ano | findstr :9090      # expect 0.0.0.0:9090 ... LISTENING
+```
+
+The Angular UI uses relative API paths (`/ollama`, `/sandbox`, `/streamlit`), so
+it works over any host/IP with **no rebuild**. nginx uses `server_name _;` so any
+`Host` header (IP or hostname) is accepted.
+
+> ⚠️ **Security:** exposing on the LAN lets anyone on the network use the demo and
+> the local LLM through the proxy. Only do this on a **trusted** network, and stop
+> the stack after the demo (`docker compose ... down`). Keep Ollama/bridge/DBs on
+> loopback — do not add LAN port bindings for them.
+
 ## Manual commands
 
 ```bash

@@ -115,6 +115,33 @@ docker compose -f docker-compose.yml -f docker-compose.proxy.dev.yml up -d rever
 
 See `ai-ecosystem-sandbox/reverse-proxy/README.md` for the full routing map.
 
+## 6B. LAN / external access (share the demo)
+
+The proxy binds `0.0.0.0`, so other machines on your network can reach the demo.
+**Only the proxy is LAN-exposed**; Ollama, the bridge and the DBs bind to
+`127.0.0.1` and are reached only through the proxy on the Docker network.
+
+```powershell
+# 1) Find your LAN IPv4 (active adapter, e.g. Wi-Fi)
+ipconfig                      # e.g. 192.168.1.32
+
+# 2) Allow the port through Windows Firewall (elevated / Admin prompt, once)
+netsh advfirewall firewall add rule name="CSI Nora Demo (TCP 9090)" dir=in action=allow protocol=TCP localport=9090
+#   remove after demo:
+#   netsh advfirewall firewall delete rule name="CSI Nora Demo (TCP 9090)"
+
+# 3) Confirm binding
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml ps
+netstat -ano | findstr :9090    # expect 0.0.0.0:9090 ... LISTENING
+```
+
+Share: **http://<LAN-IP>:9090/** (e.g. `http://192.168.1.32:9090/`). The UI uses
+relative API paths, so no rebuild is needed for IP access.
+
+> ⚠️ Security: exposing on the LAN lets anyone on the network use the demo and the
+> local LLM via the proxy. Use only on a **trusted** network and stop the stack
+> after the demo (`docker compose ... down`).
+
 ## 7. Verify
 
 | Check | Command / URL |
@@ -123,6 +150,7 @@ See `ai-ecosystem-sandbox/reverse-proxy/README.md` for the full routing map.
 | Bridge | `curl http://127.0.0.1:8090/healthz` |
 | Nora | http://localhost:4200 |
 | Reverse proxy | `curl http://localhost/healthz` (or your `-Port`) |
+| LAN access | `curl http://<LAN-IP>:9090/healthz` (from another host) |
 | Qdrant | `curl http://127.0.0.1:6333/readyz` |
 
 ## Troubleshooting

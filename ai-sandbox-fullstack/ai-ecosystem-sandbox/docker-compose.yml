@@ -17,7 +17,9 @@ services:
     container_name: sandbox-ollama
     restart: unless-stopped
     ports:
-      - "${OLLAMA_HOST_PORT:-11434}:11434"
+      # Bind to loopback only — Ollama must NOT be reachable from the LAN.
+      # The UI reaches it through the reverse proxy (/ollama) on the Docker network.
+      - "127.0.0.1:${OLLAMA_HOST_PORT:-11434}:11434"
     volumes:
       - ollama_data:/root/.ollama
     environment:
@@ -40,8 +42,9 @@ services:
     container_name: sandbox-qdrant
     restart: unless-stopped
     ports:
-      - "${QDRANT_HTTP_PORT:-6333}:6333"
-      - "${QDRANT_GRPC_PORT:-6334}:6334"
+      # Loopback only — internal service, reached via Docker network / proxy.
+      - "127.0.0.1:${QDRANT_HTTP_PORT:-6333}:6333"
+      - "127.0.0.1:${QDRANT_GRPC_PORT:-6334}:6334"
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
@@ -55,7 +58,8 @@ services:
     container_name: sandbox-chroma
     restart: unless-stopped
     ports:
-      - "${CHROMA_HOST_PORT:-8000}:8000"
+      # Loopback only — internal service.
+      - "127.0.0.1:${CHROMA_HOST_PORT:-8000}:8000"
     volumes:
       - chroma_data:/chroma/chroma
     environment:
@@ -73,7 +77,8 @@ services:
     container_name: sandbox-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_HOST_PORT:-6379}:6379"
+      # Loopback only — internal service (never expose Redis to the LAN).
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
@@ -87,7 +92,8 @@ services:
     container_name: sandbox-postgres
     restart: unless-stopped
     ports:
-      - "${POSTGRES_HOST_PORT:-5432}:5432"
+      # Loopback only — internal service (never expose Postgres to the LAN).
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -124,7 +130,8 @@ services:
       langfuse-db:
         condition: service_healthy
     ports:
-      - "${LANGFUSE_HOST_PORT:-3000}:3000"
+      # Loopback only — internal service.
+      - "127.0.0.1:${LANGFUSE_HOST_PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:-langfuse_dev_password}@langfuse-db:5432/langfuse
       NEXTAUTH_URL: http://localhost:${LANGFUSE_HOST_PORT:-3000}
@@ -144,7 +151,8 @@ services:
     container_name: sandbox-jupyter
     restart: unless-stopped
     ports:
-      - "${JUPYTER_HOST_PORT:-8888}:8888"
+      # Loopback only — internal service.
+      - "127.0.0.1:${JUPYTER_HOST_PORT:-8888}:8888"
     volumes:
       - ./:/workspace:rw
       - jupyter_data:/home/jovyan/.local
@@ -180,7 +188,8 @@ services:
     restart: unless-stopped
     profiles: ["dashboard"]
     ports:
-      - "${STREAMLIT_HOST_PORT:-8501}:8501"
+      # Loopback only — reached via the reverse proxy at /streamlit/.
+      - "127.0.0.1:${STREAMLIT_HOST_PORT:-8501}:8501"
     volumes:
       - ./:/app:rw
     env_file:
