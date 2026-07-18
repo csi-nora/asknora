@@ -5,6 +5,7 @@ import { DocumentService }  from '../../services/document.service';
 import { AuditService }     from '../../services/audit.service';
 import { RagService }       from '../../services/rag.service';
 import { EmbeddingService } from '../../services/embedding.service';
+import { KbStorageService } from '../../services/kb-storage.service';
 import { SECTORS, SECTOR_KEYS } from '../../data/sectors.data';
 import { Sensitivity } from '../../models';
 
@@ -47,6 +48,10 @@ import { Sensitivity } from '../../models';
     <div *ngIf="embedSvc.status()==='loading'" class="embed-progress" style="margin:4px 0;padding:4px 8px">
       <div class="embed-spinner"></div>
       <span>Embedding {{ embedSvc.progress() }}%</span>
+    </div>
+    <div *ngIf="kb.overflow()" class="rag-mini-row kb-overflow" title="KB exceeded the ~5 MB browser storage budget and was automatically moved to the larger persistent store (IndexedDB).">
+      <span>💾 Persistent store</span>
+      <span>IndexedDB{{ kb.persisted() ? ' · pinned' : '' }}</span>
     </div>
   </div>
 
@@ -112,6 +117,7 @@ import { Sensitivity } from '../../models';
     .rag-mini{padding:6px 8px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);
       border-radius:8px;font-size:10px;margin:2px 0}
     .rag-mini-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+    .kb-overflow{margin-top:4px;padding-top:4px;border-top:1px solid rgba(59,130,246,.15);color:var(--green)}
     .upload-zone{border:1.5px dashed var(--border);border-radius:10px;padding:12px;text-align:center;
       cursor:pointer;transition:.2s;margin:4px 0;
       &:hover,.dragover{border-color:var(--border-a);background:rgba(224,0,26,.04)}}
@@ -151,6 +157,7 @@ export class SectorPanelComponent {
     private au: AuditService,
     public rag: RagService,
     public embedSvc: EmbeddingService,
+    public kb: KbStorageService,
   ) {}
 
   pick(k: string) {

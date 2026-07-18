@@ -1,12 +1,10 @@
 import { Injectable, signal } from '@angular/core';
 import { KbDocument, RagConfig, RagStats, RetrievedChunk, TextChunk } from '../models';
-import { ChunkerService }   from './chunker.service';
-import { Bm25Service }      from './bm25.service';
-import { EmbeddingService } from './embedding.service';
-import { StateService }     from './state.service';
-
-const LS_CHUNKS  = 'csinora_chunks';
-const LS_VECTORS = 'csinora_vectors';
+import { ChunkerService }    from './chunker.service';
+import { Bm25Service }       from './bm25.service';
+import { EmbeddingService }  from './embedding.service';
+import { StateService }      from './state.service';
+import { KbStorageService }  from './kb-storage.service';
 
 @Injectable({ providedIn: 'root' })
 export class RagService {
@@ -17,19 +15,31 @@ export class RagService {
     lastQueryMs: 0, mode: 'hybrid'
   });
 
-  // In-memory stores
+  // In-memory stores (source of truth for fast retrieval; mirrored to KbStore)
   private _chunks  = new Map<string, TextChunk>();
   private _vectors = new Map<string, number[]>();
+
+  /** Resolves once the persisted index has been loaded from the active tier. */
+  private _ready: Promise<void>;
 
   constructor(
     private chunker:  ChunkerService,
     private bm25:     Bm25Service,
     private embedSvc: EmbeddingService,
     private state:    StateService,
+    private kb:       KbStorageService,
   ) {
-    this._loadFromStorage();
+    this._ready = this._init();
+  }
+
+  private async _init(): Promise<void> {
+    await this.kb.init();
+    await this._loadFromStore();
     this._syncStats();
   }
+
+  /** Await this before any read that depends on the persisted index being loaded. */
+  ready(): Promise<void> { return this._ready; }
 
   // ── Index documents ─────────────────────────────────────
   async indexDocuments(docs: KbDocument[]): Promise<void> {
@@ -76,11 +86,11 @@ export class RagService {
       }
     }
 
-    this._saveToStorage();
+    await this._saveToStore();
     this._syncStats();
   }
 
-  removeDocChunks(docId: string): void {
+  async removeDocChunks(docId: string): Promise<void> {
     for (const [id, chunk] of this._chunks) {
       if (chunk.docId === docId) {
         this._chunks.delete(id);
@@ -88,21 +98,21 @@ export class RagService {
       }
     }
     this.bm25.build([...this._chunks.values()]);
-    this._saveToStorage();
+    await this._saveToStore();
     this._syncStats();
   }
 
-  clearAll(): void {
+  async clearAll(): Promise<void> {
     this._chunks.clear();
     this._vectors.clear();
     this.bm25.build([]);
-    localStorage.removeItem(LS_CHUNKS);
-    localStorage.removeItem(LS_VECTORS);
+    await this.kb.clearAll();
     this._syncStats();
   }
 
   // ── Retrieve ─────────────────────────────────────────────
   async retrieve(query: string): Promise<RetrievedChunk[]> {
+    await this._ready;
     if (!this._chunks.size && !this.bm25.hasIndex) return [];
     const t0  = performance.now();
     const cfg = this.state.ragConfig();
@@ -188,29 +198,25 @@ export class RagService {
       .sort((a, b) => b.hybridScore - a.hybridScore);
   }
 
-  // ── Storage ──────────────────────────────────────────────
-  private _saveToStorage(): void {
+  // ── Storage (tiered: localStorage → IndexedDB overflow via KbStore) ──────
+  private async _saveToStore(): Promise<void> {
     try {
-      localStorage.setItem(LS_CHUNKS,  JSON.stringify([...this._chunks.values()]));
-      localStorage.setItem(LS_VECTORS, JSON.stringify([...this._vectors.entries()]));
+      await this.kb.saveChunks([...this._chunks.values()]);
+      await this.kb.saveVectors([...this._vectors.entries()]);
     } catch (e) { console.warn('RAG storage save failed', e); }
   }
 
-  private _loadFromStorage(): void {
+  private async _loadFromStore(): Promise<void> {
     try {
-      const rc = localStorage.getItem(LS_CHUNKS);
-      if (rc) {
-        const chunks: TextChunk[] = JSON.parse(rc);
+      const chunks = await this.kb.loadChunks();
+      if (chunks.length) {
         this._chunks = new Map(chunks.map(c => [c.id, c]));
         this.bm25.build(chunks);
       }
-      const rv = localStorage.getItem(LS_VECTORS);
-      if (rv) {
-        const vecs: [string, number[]][] = JSON.parse(rv);
+      const vecs = await this.kb.loadVectors();
+      if (vecs.length) {
         this._vectors = new Map(vecs);
-        if (this._vectors.size > 0) {
-          this.stats.update(s => ({ ...s, embedStatus: 'ready', indexedChunks: this._vectors.size }));
-        }
+        this.stats.update(s => ({ ...s, embedStatus: 'ready', indexedChunks: this._vectors.size }));
       }
     } catch (e) { console.warn('RAG storage load failed', e); }
   }
@@ -229,7 +235,7 @@ export class RagService {
   get indexedChunks() { return this._vectors.size; }
   get hasIndex()      { return this._chunks.size > 0; }
   storageBytes(): number {
-    return (localStorage.getItem(LS_CHUNKS)?.length || 0) * 2
-         + (localStorage.getItem(LS_VECTORS)?.length || 0) * 2;
+    return (localStorage.getItem('csinora_chunks')?.length || 0) * 2
+         + (localStorage.getItem('csinora_vectors')?.length || 0) * 2;
   }
 }

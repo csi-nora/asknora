@@ -6,6 +6,7 @@ import { StorageService } from './services/storage.service';
 import { AuditService }   from './services/audit.service';
 import { ApiService }     from './services/api.service';
 import { RagService }     from './services/rag.service';
+import { KbStorageService } from './services/kb-storage.service';
 import { SECTORS }        from './data/sectors.data';
 import { HeaderComponent }      from './components/header/header.component';
 import { SectorPanelComponent } from './components/sector-panel/sector-panel.component';
@@ -52,12 +53,21 @@ export class AppComponent implements OnInit, OnDestroy {
     private au:  AuditService,
     private api: ApiService,
     private rag: RagService,
+    private kb:  KbStorageService,
   ) {}
 
   ngOnInit() {
     this.ss.loadPrefs();
     this._restore();
     this.ss.refresh();
+
+    // If the KB overflowed to the persistent store, doc content lives in
+    // IndexedDB — merge it back once the tier is known (non-blocking).
+    this.kb.init().then(async () => {
+      if (this.kb.overflow() && this.st.docs.length) {
+        this.st.setDocs(await this.ss.rehydrateDocs(this.st.docs));
+      }
+    });
 
     // Auto-save on any message/doc change
     combineLatest([this.st.messages$, this.st.docs$])

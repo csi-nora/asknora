@@ -47,7 +47,7 @@ export class DocumentService {
   }
 
   async removeDoc(id: string): Promise<void> {
-    this.rag.removeDocChunks(id);
+    await this.rag.removeDocChunks(id);
     this.state.removeDoc(id);
     this.audit.log('Doc Removed', 'Document removed from KB and RAG index', 'internal');
   }

@@ -4,6 +4,7 @@ import {
   ApiConfig, AuditEntry, ChatMessage, KbDocument,
   NamedSession, RagConfig, Sensitivity, StorageStats, UserRole
 } from '../models';
+import { KbStorageService } from './kb-storage.service';
 
 const LS = {
   SESSION:  'csinora_session',
@@ -21,6 +22,8 @@ const BUDGET = 5 * 1024 * 1024;
 export class StorageService {
   stats$        = new BehaviorSubject<StorageStats>(this._empty());
   rememberKeys$ = new BehaviorSubject<boolean>(false);
+
+  constructor(private kb: KbStorageService) {}
 
   set<T>(key: string, v: T): void {
     try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { console.warn('LS write failed', e); }
@@ -52,7 +55,16 @@ export class StorageService {
       useRag: data.useRag, ragConfig: data.ragConfig, msgCount: data.msgCount,
       messages: data.messages, savedAt: new Date().toISOString()
     });
-    this.set(LS.DOCS,    data.docs);
+    // In overflow tier, keep only lightweight doc metadata in localStorage and
+    // offload the (heavier) doc content to the persistent IndexedDB store.
+    if (this.kb.overflow()) {
+      this.set(LS.DOCS, data.docs.map(d => ({ ...d, content: '' })));
+      const map: Record<string, string> = {};
+      for (const d of data.docs) map[d.id] = d.content;
+      this.kb.saveDocContent(map).catch(() => {});
+    } else {
+      this.set(LS.DOCS, data.docs);
+    }
     this.set(LS.AUDIT,   data.audits.slice(0, 100));
     this.set(LS.API_CFG, {
       provider: data.api.provider,
@@ -67,6 +79,12 @@ export class StorageService {
 
   loadSession()  { return this.get<any>(LS.SESSION, null); }
   loadDocs()     { return this.get<KbDocument[]>(LS.DOCS, []); }
+  /** Merge doc content back from the overflow store (no-op on the fast tier). */
+  async rehydrateDocs(docs: KbDocument[]): Promise<KbDocument[]> {
+    if (!this.kb.overflow() || !docs.length) return docs;
+    const map = await this.kb.loadDocContent();
+    return docs.map(d => d.content ? d : { ...d, content: map[d.id] || '' });
+  }
   loadAudit()    { return this.get<AuditEntry[]>(LS.AUDIT, []); }
   loadApiCfg()   { return this.get<Partial<ApiConfig>>(LS.API_CFG, {}); }
   loadApiKeys()  { return this.get<Record<string, string>>(LS.API_KEYS, {}); }

@@ -6,6 +6,7 @@ import { StorageService } from '../../../services/storage.service';
 import { AuditService }  from '../../../services/audit.service';
 import { ApiService, PROV_LABEL } from '../../../services/api.service';
 import { RagService }    from '../../../services/rag.service';
+import { KbStorageService } from '../../../services/kb-storage.service';
 import { NamedSession }  from '../../../models';
 import { SECTORS }       from '../../../data/sectors.data';
 
@@ -89,6 +90,12 @@ import { SECTORS }       from '../../../data/sectors.data';
     <div class="storage-bar-wrap" style="height:7px">
       <div class="storage-bar" [ngClass]="barCls()" [style.width.%]="ss.stats$.value.pct"></div>
     </div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:6px">
+      <span style="color:var(--muted)">KB backing store</span>
+      <span [style.color]="kb.overflow() ? 'var(--green)' : 'var(--dim)'">
+        {{ kb.overflow() ? '💾 IndexedDB (overflow' + (kb.persisted() ? ', pinned)' : ')') : 'localStorage (fast path)' }}
+      </span>
+    </div>
     <div class="stor-clear-row" style="margin-top:8px">
       <button class="stor-clear-btn" (click)="clear('messages')">Messages</button>
       <button class="stor-clear-btn" (click)="clear('docs')">Docs</button>
@@ -112,6 +119,7 @@ export class PortabilityModalComponent implements OnInit {
     public au: AuditService,
     private apiSvc: ApiService,
     private rag: RagService,
+    public kb: KbStorageService,
   ) {}
 
   ngOnInit() { this.sessions.set(this.ss.getSessions()); this.ss.refresh(); }
