@@ -35,6 +35,15 @@ The launcher builds the UI, starts all containers on **port 9090**, pulls the de
 
 📖 **Full step-by-step runbook (resources, Bridged setup, auto-start on reboot, troubleshooting):** [`ai-sandbox-fullstack/RUN-ON-UBUNTU.md`](ai-sandbox-fullstack/RUN-ON-UBUNTU.md)
 
+### One-click launchers (no typing)
+
+| Platform | Launcher | What it does |
+|----------|----------|--------------|
+| **Windows** | `ai-sandbox-fullstack/RUN-ASKNORA.bat` | Double-click → builds UI, starts the Docker stack on port 9090, pulls the model, opens the browser. `STOP-ASKNORA.bat` stops it. |
+| **Ubuntu / VM** | `ai-sandbox-fullstack/run-asknora.sh` | `chmod +x run-asknora.sh && ./run-asknora.sh` → clones (if needed), builds, and starts the stack; prints the Bridged LAN URL. |
+
+Both launchers auto-locate the sandbox, so they also work from the USB/deployable root.
+
 ---
 
 ## Prerequisites
