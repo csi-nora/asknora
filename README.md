@@ -2,6 +2,11 @@
 
 **Singtel CSI** · Angular 17 · Standalone components · Hybrid AI (API + local KB) · Browser persistence
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/csi-nora/asknora?quickstart=1)
+
+> **🌐 Live demo (UI):** **https://csi-nora.github.io/asknora/**
+> **🚀 Full stack in the cloud:** click the **Open in GitHub Codespaces** badge above — it builds the UI and runs the whole Docker stack (Ollama + vector DBs + reverse proxy) with a real local model; open the forwarded **port 9090**. Details in [`DEMO.md`](DEMO.md).
+
 ---
 
 ## Prerequisites
