@@ -9,7 +9,7 @@
 
 ![CSI Nora — Hybrid RAG portfolio advisor demo](docs/demo.gif)
 
-<sub>Live UI walkthrough: sector selection → grounded Hybrid RAG query → provider & compute-scale (CPU/GPU/NPU) configuration.</sub>
+<sub>Real end-to-end demo against the local stack: pick a business sector → configure the on-prem model (Ollama <code>llama3.2:3b</code>, CPU/GPU/NPU compute scale) → ask a question → get a genuine, grounded answer from the local LLM via Hybrid RAG.</sub>
 
 ---
 
