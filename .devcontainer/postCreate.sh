@@ -22,13 +22,16 @@ pushd "$SANDBOX" >/dev/null
 echo "==> [3/4] Starting full stack (proxy on :$PROXY_HTTP_PORT)"
 docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
 
-echo "==> [4/4] Pulling demo model (llama3.2:1b, ~1.3 GB) — this can take a few minutes"
+echo "==> [4/4] Pulling demo models — llama3.2:3b (default, ~2 GB) + llama3.2:1b (fast option)"
 # Wait for Ollama to accept connections, then pull. Tolerate slow first boot.
 for i in $(seq 1 30); do
   if docker exec sandbox-ollama ollama list >/dev/null 2>&1; then break; fi
   sleep 3
 done
-docker exec sandbox-ollama ollama pull llama3.2:1b || echo "WARN: model pull failed; run it manually later."
+# 3b is the UI default (matches the README demo) — better instruction-following.
+docker exec sandbox-ollama ollama pull llama3.2:3b || echo "WARN: 3b pull failed; run it manually later."
+# 1b is an optional faster fallback selectable from the API config modal.
+docker exec sandbox-ollama ollama pull llama3.2:1b || echo "WARN: 1b pull failed (optional fast model)."
 popd >/dev/null
 
 cat <<'EOF'

@@ -14,6 +14,6 @@ export const environment = {
   /** Optional sandbox BFF (device scale + guardrails) */
   sandboxBridgeUrl: '/sandbox',
   streamlitUrl: 'http://localhost:8501',
-  defaultOllamaModel: 'llama3.2:1b',
+  defaultOllamaModel: 'llama3.2:3b',
   defaultAccelDevice: 'auto' as const,
 };

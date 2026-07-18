@@ -25,6 +25,7 @@ const MODELS: Record<ApiProvider, {val:string;lbl:string}[]> = {
     {val:'custom',lbl:'Custom…'},
   ],
   ollama: [
+    {val:'llama3.2:3b',lbl:'llama3.2:3b (recommended)'},
     {val:'llama3.2:1b',lbl:'llama3.2:1b (fast)'},
     {val:'llama3.1:8b',lbl:'llama3.1:8b'},
     {val:'mistral:7b',lbl:'mistral:7b'},

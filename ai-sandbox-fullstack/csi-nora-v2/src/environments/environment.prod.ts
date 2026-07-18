@@ -13,6 +13,6 @@ export const environment = {
   sandboxBridgeUrl: '/sandbox',
   /** Streamlit dashboard (nginx: location /streamlit/) */
   streamlitUrl: '/streamlit/',
-  defaultOllamaModel: 'llama3.2:1b',
+  defaultOllamaModel: 'llama3.2:3b',
   defaultAccelDevice: 'auto' as const,
 };
