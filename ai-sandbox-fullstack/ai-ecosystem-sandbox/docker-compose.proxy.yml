@@ -1,0 +1,80 @@
+# Full front-facing app overlay — single entry point + containerized services.
+#
+# Brings up nginx (reverse proxy), the Nora bridge (FastAPI) and the Streamlit
+# dashboard, all on the sandbox network, so the whole app starts with ONE
+# command on top of the base infra:
+#
+#   1) Build the UI:  cd ../csi-nora-v2 && npm run build
+#   2) Start:         docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
+#   3) Open:          http://localhost/            (Nora UI)
+#                     http://localhost/ollama/     (LLM API)
+#                     http://localhost/sandbox/    (bridge)
+#                     http://localhost/streamlit/  (dashboard)
+#
+# Change the published port with PROXY_HTTP_PORT (e.g. PROXY_HTTP_PORT=9090).
+
+services:
+  reverse-proxy:
+    image: nginx:1.27-alpine
+    container_name: sandbox-proxy
+    restart: unless-stopped
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+    volumes:
+      - ./reverse-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Built Angular SPA (run `npm run build` in ../csi-nora-v2 first)
+      - ../csi-nora-v2/dist/csi-nora/browser:/usr/share/nginx/html:ro
+    depends_on:
+      ollama:
+        condition: service_started
+      nora-bridge:
+        condition: service_started
+      streamlit:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── CSI Nora bridge (FastAPI BFF: guardrails + device scaling) ─────────────
+  nora-bridge:
+    build:
+      context: .
+      dockerfile: apps/nora_bridge/Dockerfile
+    container_name: sandbox-nora-bridge
+    restart: unless-stopped
+    ports:
+      - "${BRIDGE_HOST_PORT:-8090}:8090"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      LLM_MODEL_OLLAMA: ${DEFAULT_OLLAMA_MODEL:-llama3.2:1b}
+      ACCEL_DEVICE: ${ACCEL_DEVICE:-auto}
+    depends_on:
+      ollama:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8090/healthz >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Streamlit dashboard (served under /streamlit/ via the proxy) ───────────
+  # Overrides the profiled base service so it starts as part of the app stack.
+  streamlit:
+    profiles: !reset []
+    command:
+      - streamlit
+      - run
+      - dashboard/app_lite.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+      - --server.baseUrlPath=streamlit
+      - --server.enableCORS=false
+      - --server.enableXsrfProtection=false
+      - --browser.gatherUsageStats=false

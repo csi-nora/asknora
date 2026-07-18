@@ -1,0 +1,9 @@
+# Lean deps for the containerized dashboard (runs dashboard/app_lite.py).
+# Heavy provider imports (chromadb, qdrant, torch, langchain) are lazy, so the
+# lite dashboard needs only these prebuilt/pure-python wheels — fast, reliable.
+streamlit==1.42.0
+httpx==0.28.1
+redis==5.2.1
+pydantic==2.10.6
+pydantic-settings==2.7.1
+python-dotenv==1.0.1

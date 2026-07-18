@@ -1,0 +1,12 @@
+# CPU-only overlay — force Ollama onto CPU.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d
+
+services:
+  ollama:
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+      OLLAMA_KEEP_ALIVE: 24h
+      OLLAMA_NUM_GPU: "0"
+      ACCEL_DEVICE: cpu
+      ACCEL_BACKEND: cpu
+      CUDA_VISIBLE_DEVICES: ""

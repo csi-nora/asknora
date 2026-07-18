@@ -1,0 +1,4 @@
+# Minimal Jupyter image deps; full sandbox pins are in ../requirements.txt
+ipykernel==6.29.5
+jupyterlab==4.3.5
+notebook==7.3.2

@@ -1,0 +1,21 @@
+# Reverse proxy overlay — DEV mode.
+# Proxies / to the live `ng serve` dev server (host :4200) with live-reload,
+# so you do NOT need to build the Angular app.
+#
+#   1) In csi-nora-v2:  npm start        (ng serve on :4200)
+#   2) Start proxy:     docker compose -f docker-compose.yml -f docker-compose.proxy.dev.yml up -d reverse-proxy
+#   3) Open:            http://localhost/
+
+services:
+  reverse-proxy:
+    image: nginx:1.27-alpine
+    container_name: sandbox-proxy
+    restart: unless-stopped
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+    volumes:
+      - ./reverse-proxy/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - ollama

@@ -1,0 +1,62 @@
+name: Deploy CSI Nora UI to GitHub Pages
+
+# Publishes the Angular CSI Nora UI as a static site at
+# https://<owner>.github.io/asknora/  (a UI/UX demo — see DEMO.md for how to
+# make chat work: enter a cloud LLM key, or use the Codespaces full stack).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ai-sandbox-fullstack/csi-nora-v2/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ai-sandbox-fullstack/csi-nora-v2/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ai-sandbox-fullstack/csi-nora-v2
+        run: npm ci
+
+      - name: Build (base-href for project pages)
+        working-directory: ai-sandbox-fullstack/csi-nora-v2
+        run: npm run build -- --base-href "/asknora/"
+
+      - name: SPA fallback + disable Jekyll
+        working-directory: ai-sandbox-fullstack/csi-nora-v2/dist/csi-nora/browser
+        run: |
+          cp index.html 404.html
+          touch .nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ai-sandbox-fullstack/csi-nora-v2/dist/csi-nora/browser
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

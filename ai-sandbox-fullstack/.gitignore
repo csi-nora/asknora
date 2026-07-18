@@ -1,0 +1,45 @@
+# Dependencies / secrets
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+dist/
+.tmp/
+.angular/
+
+# Env & secrets
+.env
+!.env.example
+*.pem
+*.key
+credentials*.json
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs / local data
+*.log
+logs/
+data/uploads/
+.chroma/
+qdrant_storage/
+wandb/
+
+# Bundles / archives
+*.zip
+*.tar.gz
+_bundle_staging/
+_release/
+
+# Streamlit
+.streamlit/secrets.toml

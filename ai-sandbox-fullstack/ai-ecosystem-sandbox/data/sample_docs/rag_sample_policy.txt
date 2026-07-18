@@ -1,0 +1,11 @@
+Hybrid RAG combines dense vector retrieval with sparse keyword search (BM25)
+and optional re-ranking. In this lab, documents are chunked, embedded with
+Sentence-Transformers or OpenAI, stored in Qdrant/Chroma/pgvector, and retrieved
+before LLM generation. The local fallback endpoint is Ollama at port 11434.
+
+Key retrieval parameters:
+- chunk_size: 500 tokens
+- overlap: 80 tokens
+- top_k: 3
+
+For production, add access controls, audit logging, and PDPA-aligned data handling.

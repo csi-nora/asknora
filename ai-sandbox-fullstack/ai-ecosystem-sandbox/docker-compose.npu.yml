@@ -1,0 +1,20 @@
+# NPU overlay — routes accel env to OpenVINO NPU for host Python demos.
+# Ollama stays CPU-safe (limited NPU support in Ollama today).
+#
+# Host (Intel AI PC):
+#   pip install openvino
+#   $env:ACCEL_DEVICE="npu"; $env:OPENVINO_DEVICE="NPU"
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.npu.yml up -d
+#   .\scripts\set_accel.ps1 -Device npu
+
+services:
+  ollama:
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+      OLLAMA_KEEP_ALIVE: 24h
+      OLLAMA_NUM_GPU: "0"
+      ACCEL_DEVICE: npu
+      ACCEL_BACKEND: openvino_npu
+      OPENVINO_DEVICE: ${OPENVINO_DEVICE:-NPU}

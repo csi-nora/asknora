@@ -1,0 +1,106 @@
+# Modern AI Ecosystem Sandbox — Python 3.11+
+# Install: python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt
+#
+# Optional extras (uncomment if needed):
+#   pip install -r requirements-optional.txt
+
+# ── Core ──────────────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+pydantic==2.10.6
+pydantic-settings==2.7.1
+httpx==0.28.1
+tenacity==9.0.0
+rich==13.9.4
+typer==0.15.1
+
+# ── LLM providers ─────────────────────────────────────────────────────────────
+openai==1.61.0
+anthropic==0.45.2
+google-generativeai==0.8.4
+groq==0.15.0
+ollama==0.4.7
+litellm==1.60.2
+
+# ── LangChain ecosystem ───────────────────────────────────────────────────────
+langchain==0.3.17
+langchain-core==0.3.33
+langchain-community==0.3.16
+langchain-text-splitters==0.3.5
+langchain-openai==0.3.3
+langchain-anthropic==0.3.3
+langchain-google-genai==2.0.9
+langchain-ollama==0.2.2
+langgraph==0.2.67
+langsmith==0.3.6
+
+# ── LlamaIndex ────────────────────────────────────────────────────────────────
+llama-index==0.12.16
+llama-index-core==0.12.16
+llama-index-embeddings-openai==0.3.1
+llama-index-embeddings-huggingface==0.4.0
+llama-index-vector-stores-qdrant==0.4.3
+llama-index-vector-stores-chroma==0.4.1
+llama-index-llms-openai==0.3.18
+llama-index-llms-ollama==0.4.0
+
+# ── RAG / frameworks ──────────────────────────────────────────────────────────
+haystack-ai==2.9.0
+dspy-ai==2.5.43
+datasets==3.2.0
+
+# ── Agentic AI ────────────────────────────────────────────────────────────────
+crewai==0.98.0
+crewai-tools==0.25.8
+pyautogen==0.7.3
+semantic-kernel==1.21.3
+pydantic-ai==0.0.29
+
+# ── Embeddings ────────────────────────────────────────────────────────────────
+sentence-transformers==3.4.1
+FlagEmbedding==1.2.11
+cohere==5.13.11
+voyageai==0.3.2
+tiktoken==0.8.0
+
+# ── Vector stores / databases ─────────────────────────────────────────────────
+chromadb==0.6.3
+qdrant-client==1.13.2
+redis==5.2.1
+psycopg2-binary==2.9.10
+pgvector==0.3.6
+sqlalchemy==2.0.37
+
+# ── Memory & observability ────────────────────────────────────────────────────
+langfuse==2.60.10
+arize-phoenix==7.9.0
+trulens==1.0.4
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+
+# ── Tools / automation ───────────────────────────────────────────────────────
+duckduckgo-search==7.2.1
+wikipedia==1.4.0
+requests==2.32.3
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# ── Security / guardrails ─────────────────────────────────────────────────────
+presidio-analyzer==2.2.355
+presidio-anonymizer==2.2.355
+guardrails-ai==0.6.2
+
+# ── MCP (Model Context Protocol) ──────────────────────────────────────────────
+mcp==1.3.0
+
+# ── Demo UIs ──────────────────────────────────────────────────────────────────
+streamlit==1.42.0
+jupyterlab==4.3.5
+ipykernel==6.29.5
+notebook==7.3.2
+matplotlib==3.10.0
+pandas==2.2.3
+numpy==2.2.2
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest==8.3.4
+pytest-asyncio==0.25.3

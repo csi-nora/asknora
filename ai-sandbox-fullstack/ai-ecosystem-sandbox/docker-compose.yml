@@ -1,0 +1,222 @@
+# Modern AI Ecosystem Sandbox — infrastructure stack
+# Usage: docker compose up -d
+# See README.md for Python venv setup and demos.
+
+name: ai-ecosystem-sandbox
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 15s
+  timeout: 10s
+  retries: 5
+  start_period: 30s
+
+services:
+  # ── LLM Layer (local) ──────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:0.6.5
+    container_name: sandbox-ollama
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_HOST_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+      OLLAMA_KEEP_ALIVE: 24h
+      ACCEL_DEVICE: ${ACCEL_DEVICE:-cpu}
+      OLLAMA_NUM_GPU: ${OLLAMA_NUM_GPU:-0}
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 0"]
+    # Device overlays:
+    #   CPU: docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d
+    #   GPU: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+    #   NPU: docker compose -f docker-compose.yml -f docker-compose.npu.yml up -d
+    # Or:   .\scripts\set_accel.ps1 -Device cpu|gpu|npu
+
+  # ── Vector Databases ───────────────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.13.5
+    container_name: sandbox-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333 && echo -e \"GET /readyz HTTP/1.0\\r\\n\\r\\n\" >&3 && cat <&3 | grep -q 200'"]
+
+  chroma:
+    image: chromadb/chroma:0.6.3
+    container_name: sandbox-chroma
+    restart: unless-stopped
+    ports:
+      - "${CHROMA_HOST_PORT:-8000}:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+      ALLOW_RESET: "TRUE"
+    healthcheck:
+      <<: *healthcheck-defaults
+      # Chroma 0.6.x rejects raw HTTP/1.0 probes; use curl with HTTP/1.1
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/v1/heartbeat >/dev/null || curl -fsS http://127.0.0.1:8000/api/v2/heartbeat >/dev/null || exit 1"]
+
+  # ── Memory / Cache ─────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.4-alpine
+    container_name: sandbox-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "redis-cli", "ping"]
+
+  # ── PostgreSQL + pgvector ──────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: sandbox-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sandbox}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sandbox_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_sandbox}
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sandbox} -d ${POSTGRES_DB:-ai_sandbox}"]
+
+  # ── Observability (self-hosted Langfuse — optional but included) ───────────
+  langfuse-db:
+    image: postgres:16-alpine
+    container_name: sandbox-langfuse-db
+    restart: unless-stopped
+    profiles: ["observability"]
+    volumes:
+      - langfuse_db_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse_dev_password}
+      POSTGRES_DB: langfuse
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+
+  langfuse:
+    image: langfuse/langfuse:2.95.7
+    container_name: sandbox-langfuse
+    restart: unless-stopped
+    profiles: ["observability"]
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+    ports:
+      - "${LANGFUSE_HOST_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:-langfuse_dev_password}@langfuse-db:5432/langfuse
+      NEXTAUTH_URL: http://localhost:${LANGFUSE_HOST_PORT:-3000}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-change-me-in-production-use-openssl-rand}
+      SALT: ${LANGFUSE_SALT:-change-me-in-production-use-openssl-rand}
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "true"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/public/health >/dev/null 2>&1 || exit 1"]
+
+  # ── Demo interfaces ────────────────────────────────────────────────────────
+  jupyter:
+    build:
+      context: ./infra/jupyter
+      dockerfile: Dockerfile
+    container_name: sandbox-jupyter
+    restart: unless-stopped
+    ports:
+      - "${JUPYTER_HOST_PORT:-8888}:8888"
+    volumes:
+      - ./:/workspace:rw
+      - jupyter_data:/home/jovyan/.local
+    environment:
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-sandbox}
+      OLLAMA_BASE_URL: http://ollama:11434
+      QDRANT_URL: http://qdrant:6333
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+      REDIS_URL: redis://redis:6379/0
+      POSTGRES_DSN: postgresql://${POSTGRES_USER:-sandbox}:${POSTGRES_PASSWORD:-sandbox_dev_password}@postgres:5432/${POSTGRES_DB:-ai_sandbox}
+    depends_on:
+      ollama:
+        condition: service_started
+      qdrant:
+        condition: service_healthy
+      chroma:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8888/api >/dev/null || exit 1"]
+    profiles: ["jupyter"]
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: infra/streamlit/Dockerfile
+    container_name: sandbox-streamlit
+    restart: unless-stopped
+    profiles: ["dashboard"]
+    ports:
+      - "${STREAMLIT_HOST_PORT:-8501}:8501"
+    volumes:
+      - ./:/app:rw
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      QDRANT_URL: http://qdrant:6333
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+      REDIS_URL: redis://redis:6379/0
+      POSTGRES_DSN: postgresql://${POSTGRES_USER:-sandbox}:${POSTGRES_PASSWORD:-sandbox_dev_password}@postgres:5432/${POSTGRES_DB:-ai_sandbox}
+    depends_on:
+      ollama:
+        condition: service_started
+      qdrant:
+        condition: service_healthy
+      chroma:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8501/_stcore/health >/dev/null || exit 1"]
+
+volumes:
+  ollama_data:
+  qdrant_data:
+  chroma_data:
+  redis_data:
+  postgres_data:
+  langfuse_db_data:
+  jupyter_data:
+
+networks:
+  default:
+    name: ai-ecosystem-sandbox-net
