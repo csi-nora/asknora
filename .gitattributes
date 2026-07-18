@@ -1,0 +1,13 @@
+# Normalize line endings so launchers work on the OS that runs them,
+# regardless of each contributor's core.autocrlf setting.
+
+# Default: let Git handle text normalization.
+* text=auto
+
+# Windows batch launchers must be CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Shell scripts must be LF (or they fail with "bad interpreter" on Linux).
+*.sh text eol=lf
