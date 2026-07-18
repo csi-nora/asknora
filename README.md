@@ -7,6 +7,10 @@
 > **🌐 Live demo (UI):** **https://csi-nora.github.io/asknora/**
 > **🚀 Full stack in the cloud:** click the **Open in GitHub Codespaces** badge above — it builds the UI and runs the whole Docker stack (Ollama + vector DBs + reverse proxy) with a real local model; open the forwarded **port 9090**. Details in [`DEMO.md`](DEMO.md).
 
+![CSI Nora — Hybrid RAG portfolio advisor demo](docs/demo.gif)
+
+<sub>Live UI walkthrough: sector selection → grounded Hybrid RAG query → provider & compute-scale (CPU/GPU/NPU) configuration.</sub>
+
 ---
 
 ## Prerequisites
