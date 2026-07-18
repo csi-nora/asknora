@@ -13,6 +13,30 @@
 
 ---
 
+## 🐧 Run the full stack on Ubuntu (VMware Bridged) — one command
+
+Run the **entire self-contained stack** (Angular UI + nginx proxy + Ollama + FastAPI bridge + vector DBs) on an Ubuntu VM. With **VMware Bridged** networking the VM gets its own LAN IP, so the app is reachable from any device on the network — independently of a Windows instance.
+
+```bash
+git clone https://github.com/csi-nora/asknora.git
+cd asknora/ai-sandbox-fullstack/ai-ecosystem-sandbox
+chmod +x scripts/*.sh
+./scripts/start-linux.sh
+```
+
+The launcher builds the UI, starts all containers on **port 9090**, pulls the demo model (`llama3.2:3b`), auto-detects the Bridged LAN IP, and prints the shareable URL:
+
+```
+ On this VM  : http://localhost:9090/
+ On the LAN  : http://<VM-IP>:9090/     <-- share this URL
+```
+
+**Prerequisites on the VM:** Docker Engine + Compose, and (unless you use a prebuilt dist) Node 20. Open the firewall with `sudo ufw allow 9090/tcp`. First run downloads the ~2 GB model.
+
+📖 **Full step-by-step runbook (resources, Bridged setup, auto-start on reboot, troubleshooting):** [`ai-sandbox-fullstack/RUN-ON-UBUNTU.md`](ai-sandbox-fullstack/RUN-ON-UBUNTU.md)
+
+---
+
 ## Prerequisites
 
 | Requirement | Notes |
