@@ -1,0 +1,35 @@
+{
+  "name": "CSI Nora AI Sandbox (Demo)",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" },
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.11" }
+  },
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  "forwardPorts": [9090, 11434, 8090, 8501, 6333, 8000],
+  "portsAttributes": {
+    "9090": { "label": "CSI Nora App (reverse proxy)", "onAutoForward": "openBrowser" },
+    "11434": { "label": "Ollama API", "onAutoForward": "silent" },
+    "8090": { "label": "Nora Bridge (BFF)", "onAutoForward": "silent" },
+    "8501": { "label": "Streamlit Dashboard", "onAutoForward": "silent" },
+    "6333": { "label": "Qdrant", "onAutoForward": "silent" },
+    "8000": { "label": "Chroma", "onAutoForward": "silent" }
+  },
+  "postCreateCommand": "bash .devcontainer/postCreate.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "angular.ng-template",
+        "ms-python.python",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  },
+  "remoteUser": "vscode"
+}
