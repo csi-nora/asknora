@@ -79,8 +79,13 @@ export class RagService {
         }
         this.stats.update(s => ({ ...s, embedStatus: 'ready' }));
 
-        // Mark docs indexed
-        for (const doc of allowed) this.state.updateDoc({ ...doc, indexed: true });
+        // Mark docs indexed. Read the CURRENT doc from state so we preserve the
+        // chunkCount set in the first loop (spreading the stale `allowed` object
+        // here would clobber it back to 0 and hide the dense/BM25 tag entirely).
+        for (const doc of allowed) {
+          const cur = this.state.docs.find(d => d.id === doc.id) ?? doc;
+          this.state.updateDoc({ ...cur, indexed: true });
+        }
       } else {
         this.stats.update(s => ({ ...s, embedStatus: 'error' }));
       }
@@ -88,6 +93,40 @@ export class RagService {
 
     await this._saveToStore();
     this._syncStats();
+  }
+
+  /**
+   * Load the self-hosted embedding model at startup when persisted dense vectors
+   * already exist, so retrieval uses them immediately after a browser restart and
+   * docs re-flip from "BM25 only" back to dense — WITHOUT requiring a re-upload or
+   * manual re-index. Cheap now that the model is served locally/offline.
+   */
+  async warmUpEmbeddings(): Promise<void> {
+    await this._ready;
+    if (this._vectors.size === 0) return;          // nothing dense to restore
+    this.stats.update(s => ({ ...s, embedStatus: 'loading' }));
+    const loaded = await this.embedSvc.ensureLoaded();
+    this.stats.update(s => ({ ...s, embedStatus: loaded ? 'ready' : 'error' }));
+    if (loaded) {
+      this._refreshDocIndexedFlags();
+      this._syncStats();
+    }
+  }
+
+  /** Re-mark docs whose chunks have persisted dense vectors as indexed:true so
+   *  the UI shows "dense + BM25" (not "BM25 only") after a reload. */
+  private _refreshDocIndexedFlags(): void {
+    if (this._vectors.size === 0) return;
+    const docsWithVectors = new Set<string>();
+    for (const chunkId of this._vectors.keys()) {
+      const c = this._chunks.get(chunkId);
+      if (c) docsWithVectors.add(c.docId);
+    }
+    for (const doc of this.state.docs) {
+      if (docsWithVectors.has(doc.id) && !doc.indexed) {
+        this.state.updateDoc({ ...doc, indexed: true });
+      }
+    }
   }
 
   async removeDocChunks(docId: string): Promise<void> {
@@ -113,9 +152,14 @@ export class RagService {
   // ── Retrieve ─────────────────────────────────────────────
   async retrieve(query: string): Promise<RetrievedChunk[]> {
     await this._ready;
+    const cfg = this.state.ragConfig();
+
+    // 'off' truly disables retrieval (consistent with the RAG on/off toggle) —
+    // previously this mode was dead and silently behaved like Hybrid.
+    if (cfg.mode === 'off') return [];
+
     if (!this._chunks.size && !this.bm25.hasIndex) return [];
     const t0  = performance.now();
-    const cfg = this.state.ragConfig();
 
     let denseResults:  { id: string; score: number }[] = [];
     let sparseResults: { id: string; score: number }[] = [];
@@ -125,9 +169,12 @@ export class RagService {
       sparseResults = this.bm25.search(query, cfg.topK * 3).map(r => ({ id: r.chunk.id, score: r.score }));
     }
 
-    // Dense vector search
-    if (cfg.mode !== 'sparse' && this.embedSvc.isReady && this._vectors.size > 0) {
-      const qVec = await this.embedSvc.embed(query);
+    // Dense vector search. Load the (self-hosted) model on demand so persisted
+    // vectors are used even right after a page reload — not only after a manual
+    // re-index. `ensureLoaded()` is a no-op once the model is in memory.
+    if (cfg.mode !== 'sparse' && this._vectors.size > 0) {
+      const loaded = this.embedSvc.isReady || await this.embedSvc.ensureLoaded();
+      const qVec = loaded ? await this.embedSvc.embed(query) : null;
       if (qVec) {
         const scored: { id: string; score: number }[] = [];
         for (const [id, vec] of this._vectors) {

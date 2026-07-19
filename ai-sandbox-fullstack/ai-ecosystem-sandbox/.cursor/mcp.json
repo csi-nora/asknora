@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "csi-nora-tools": {
+      "command": "python",
+      "args": ["apps/mcp_server/server.py"],
+      "env": { "MCP_TRANSPORT": "stdio" }
+    }
+  }
+}

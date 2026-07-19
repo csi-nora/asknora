@@ -188,6 +188,28 @@ docker compose -f docker-compose.yml -f docker-compose.proxy.yml down
 
 ---
 
+## 8) MCP tools server (optional)
+
+The stack now includes a genuine **MCP server** (FastMCP) exposing `calculator`,
+`web_search` and `wikipedia_lookup`. It starts as the `mcp` container (no host
+port — internal only) and is reachable through the proxy over SSE:
+
+```bash
+curl -N http://localhost:9090/mcp/sse        # event stream (Ctrl-C to stop)
+```
+
+For **Cursor / local** use, prefer the stdio transport (no container):
+
+```bash
+cd ai-ecosystem-sandbox
+python apps/mcp_server/smoke_test.py         # proves it lists tools + runs calculator
+```
+
+`.cursor/mcp.json` is shipped at the repo root so Cursor auto-discovers it. See
+`ai-ecosystem-sandbox/apps/mcp_server/README.md` for details.
+
+---
+
 ## Security note
 
 Bridged + LAN exposure means **anyone on the network can reach the demo and drive the local

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "csi-nora-tools": {
+      "command": "python",
+      "args": ["ai-ecosystem-sandbox/apps/mcp_server/server.py"],
+      "env": { "MCP_TRANSPORT": "stdio" }
+    }
+  }
+}

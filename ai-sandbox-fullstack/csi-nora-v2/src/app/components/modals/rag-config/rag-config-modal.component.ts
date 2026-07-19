@@ -50,9 +50,9 @@ import { RagConfig, RagMode } from '../../../models';
       <input class="cfg-slider" type="range" [(ngModel)]="cfg.overlap" min="0" max="150" step="10">
     </div>
     <div class="cfg-row">
-      <span class="cfg-lbl">Min score threshold</span>
+      <span class="cfg-lbl" title="Applies to the fused RRF score (top hits are ≈0.033). Kept ≤0.02 so a high value can't suppress every citation.">Min score threshold</span>
       <span class="cfg-val">{{ cfg.minScore.toFixed(3) }}</span>
-      <input class="cfg-slider" type="range" [(ngModel)]="cfg.minScore" min="0" max="0.05" step="0.005">
+      <input class="cfg-slider" type="range" [(ngModel)]="cfg.minScore" min="0" max="0.02" step="0.002">
     </div>
   </div>
 

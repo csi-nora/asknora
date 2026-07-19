@@ -69,6 +69,11 @@ export class AppComponent implements OnInit, OnDestroy {
       }
     });
 
+    // Load the self-hosted embedding model at startup when persisted dense
+    // vectors exist, so retrieval stays DENSE after a browser restart (docs keep
+    // "dense + BM25", not "BM25 only") without any manual re-index. Non-blocking.
+    this.rag.ready().then(() => this.rag.warmUpEmbeddings());
+
     // Auto-save on any message/doc change
     combineLatest([this.st.messages$, this.st.docs$])
       .pipe(debounceTime(500), skip(1), takeUntil(this._d$))
@@ -130,10 +135,11 @@ export class AppComponent implements OnInit, OnDestroy {
       if (sess.sensitivity) this.st.sensitivity.set(sess.sensitivity);
       if (sess.useRag != null) this.st.useRag.set(sess.useRag);
       if (sess.ragConfig) {
-        // Migrate stale configs: the old default minScore (0.05) is incompatible
-        // with RRF fused scores and silently suppressed all citations.
+        // Migrate stale configs: minScore applies to RRF fused scores (top hit
+        // ≈0.033). Any value above the new 0.02 cap silently suppressed all
+        // citations, so clamp it back to the safe default.
         const rc = { ...sess.ragConfig };
-        if (rc.minScore == null || rc.minScore >= 0.05) rc.minScore = 0.01;
+        if (rc.minScore == null || rc.minScore > 0.02) rc.minScore = 0.01;
         this.st.ragConfig.set(rc);
       }
       if (sess.sector && SECTORS[sess.sector]) this.st.sector.set(sess.sector);

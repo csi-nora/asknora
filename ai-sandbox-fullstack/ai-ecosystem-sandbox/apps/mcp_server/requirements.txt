@@ -1,0 +1,7 @@
+# Lean deps for the CSI Nora MCP server (no LangChain / LLM stack — the tool
+# logic in src/providers/tool_impls.py is dependency-light).
+# mcp pulls in a consistent set of anyio/httpx/starlette/sse-starlette/uvicorn,
+# so we don't pin those individually (avoids starlette vs sse-starlette conflicts).
+mcp==1.3.0
+duckduckgo-search==7.2.1
+wikipedia==1.4.0

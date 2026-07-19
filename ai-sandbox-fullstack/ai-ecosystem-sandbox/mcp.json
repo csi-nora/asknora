@@ -1,0 +1,17 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schema/mcp.json",
+  "name": "csi-nora-tools",
+  "description": "CSI Nora sandbox MCP server — exposes calculator, web_search and wikipedia_lookup as MCP tools (shared logic with the LangChain agent in src/providers/tools.py).",
+  "mcpServers": {
+    "csi-nora-tools": {
+      "command": "python",
+      "args": ["apps/mcp_server/server.py"],
+      "env": { "MCP_TRANSPORT": "stdio" },
+      "description": "Local stdio transport. Run from the ai-ecosystem-sandbox root (or set cwd there). No container needed — ideal for Cursor / Claude Desktop."
+    },
+    "csi-nora-tools-sse": {
+      "url": "http://localhost:9090/mcp/sse",
+      "description": "HTTP/SSE transport via the nginx reverse proxy (start the full stack: docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d). Replace 9090 with your PROXY_HTTP_PORT / LAN host."
+    }
+  }
+}

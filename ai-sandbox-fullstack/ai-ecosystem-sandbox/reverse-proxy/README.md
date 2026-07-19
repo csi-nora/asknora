@@ -17,6 +17,7 @@ also removes all CORS problems.
 | `/chroma/`           | `chroma:8000`                 | Vector DB (debug/direct access)            |
 | `/models/`           | static (SPA dist)             | Self-hosted embedding model (offline dense vectors) |
 | `/vendor/`           | static (SPA dist)             | transformers.js + ORT WASM + pdf.js (offline runtime) |
+| `/mcp/`              | `mcp:8000`                    | MCP server (FastMCP over SSE; stream at `/mcp/sse`) |
 | `/healthz`           | nginx                         | Proxy liveness probe                       |
 
 In **prod** everything is containerized on the `ai-ecosystem-sandbox-net`

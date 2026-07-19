@@ -214,7 +214,18 @@ ai-ecosystem-sandbox/
 
 ### MCP / FastMCP
 
-The `mcp` package is included. Add MCP server configs under `infra/mcp/` (future extension point).
+**Implemented.** A genuine MCP server (FastMCP) lives in
+[`apps/mcp_server/`](apps/mcp_server/README.md) and exposes the sandbox tools
+(`calculator`, `web_search`, `wikipedia_lookup`) — the same logic the LangChain
+agent uses (`src/providers/tool_impls.py`).
+
+- **Local / Cursor (stdio):** discovered via `.cursor/mcp.json`, or run
+  `python apps/mcp_server/server.py`.
+- **Networked (SSE):** the `mcp` container is part of the full stack and is
+  reachable through the proxy at `/mcp/sse` (no host port published).
+- **Config:** see `mcp.json` (both transports) and `.cursor/mcp.json`.
+- **Prove it:** `python apps/mcp_server/smoke_test.py` (stdio) or
+  `python apps/mcp_server/smoke_test_sse.py` (SSE).
 
 ### GPU passthrough (Ollama)
 
