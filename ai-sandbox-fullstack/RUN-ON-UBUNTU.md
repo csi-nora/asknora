@@ -80,6 +80,63 @@ cd csi-nora-fullstack/ai-ecosystem-sandbox
 
 ---
 
+## 3B) Updating an existing VM clone (resolving `git pull` conflicts)
+
+Already have the repo on the VM and want the latest version? Just `git pull`. If you
+see this, git is protecting local edits to tracked files:
+
+```
+error: Your local changes to the following files would be overwritten by merge:
+    ai-sandbox-fullstack/ai-ecosystem-sandbox/scripts/start-linux.sh
+    ai-sandbox-fullstack/ai-ecosystem-sandbox/scripts/start_proxy.sh
+Please commit your changes or stash them before you merge. Aborting
+```
+
+**Why it happens:** the `*.sh` launchers are tracked in git, so any local change —
+manual edits, an editor rewriting **line endings** (CRLF↔LF), or `chmod +x` flipping
+the file mode — makes git think you have uncommitted work that a pull would clobber.
+
+**Recommended fix — GitHub is the source of truth, discard the local script copies:**
+```bash
+# from the ai-ecosystem-sandbox dir (where you saw the error)
+git checkout -- scripts/start-linux.sh scripts/start_proxy.sh
+git pull
+```
+
+**Nuclear option — make the clone match GitHub exactly** (discards ALL local changes):
+```bash
+git fetch origin && git reset --hard origin/main
+```
+> Safe for your data: uploaded **Knowledge Base docs live in the browser**
+> (localStorage → IndexedDB), **not** in the repo, so a hard reset never touches them.
+
+**If you WANT to keep your local edits**, stash them across the pull, or commit them:
+```bash
+git stash && git pull && git stash pop        # re-apply your edits on top of the update
+# — or —
+git commit -am "local VM tweaks" && git pull --rebase   # (git push too, if you have write access)
+```
+
+**Prevent it from recurring:** `.gitattributes` now normalizes line endings
+(`*.sh`=LF, `*.bat`/`*.ps1`=CRLF). If `chmod` keeps producing spurious diffs on the
+scripts, tell git to ignore file-mode bits on this VM:
+```bash
+git config core.fileMode false
+```
+
+**Then restart cleanly** (clears any orphaned containers before the fresh start):
+```bash
+cd ai-ecosystem-sandbox   # if not already there
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml down --remove-orphans
+./scripts/start-linux.sh
+```
+
+Want it to survive reboots after updating? See **§6 Auto-start on reboot** — the
+services already carry `restart: unless-stopped`; just ensure `sudo systemctl enable
+docker` (and optionally add the `@reboot` crontab one-liner documented there).
+
+---
+
 ## 4) Start the whole stack — one command
 
 ```bash
