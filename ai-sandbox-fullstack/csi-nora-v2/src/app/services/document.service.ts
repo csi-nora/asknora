@@ -25,7 +25,10 @@ export class DocumentService {
   private _configurePdfWorker(): void {
     if (typeof pdfjsLib !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
       // Self-hosted (same origin) so PDF parsing works fully offline / air-gapped.
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js';
+      // Resolve against <base href> so it works at root (nginx) and under a
+      // sub-path (GitHub Pages: /asknora/).
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        new URL('vendor/pdfjs/pdf.worker.min.js', document.baseURI).href;
     }
   }
 

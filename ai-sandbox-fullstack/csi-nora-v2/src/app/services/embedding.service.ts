@@ -17,10 +17,6 @@ export class EmbeddingService {
   /** Which source actually loaded the model: 'local' (offline) | 'remote' (CDN) | null */
   source   = signal<'local' | 'remote' | null>(null);
 
-  /** Same-origin vendored assets (shipped in the Angular dist via public/). */
-  private static readonly LOCAL_LIB   = '/vendor/transformers/transformers.min.js';
-  private static readonly LOCAL_WASM  = '/vendor/transformers/';
-  private static readonly LOCAL_MODEL = '/models/';
   private static readonly REMOTE_LIB  = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1';
   private static readonly MODEL_ID    = 'Xenova/all-MiniLM-L6-v2';
 
@@ -28,6 +24,18 @@ export class EmbeddingService {
   private _loading = false;
 
   get isReady() { return this.status() === 'ready'; }
+
+  /**
+   * App base path from <base href> so vendored assets resolve correctly whether
+   * the app is served at the origin root (nginx: "/") or under a sub-path
+   * (GitHub Pages: "/asknora/"). Returns a value with a trailing slash.
+   */
+  private _basePath(): string {
+    try {
+      const p = new URL(document.baseURI).pathname;
+      return p.endsWith('/') ? p : p + '/';
+    } catch { return '/'; }
+  }
 
   async ensureLoaded(): Promise<boolean> {
     if (this._pipe) return true;
@@ -57,7 +65,10 @@ export class EmbeddingService {
 
   private async _tryLoad(mode: 'local' | 'remote'): Promise<boolean> {
     try {
-      const libUrl = mode === 'local' ? EmbeddingService.LOCAL_LIB : EmbeddingService.REMOTE_LIB;
+      const base   = this._basePath();
+      const libUrl = mode === 'local'
+        ? `${base}vendor/transformers/transformers.min.js`
+        : EmbeddingService.REMOTE_LIB;
       // Dynamic import via Function() so TS/Angular don't try to resolve the URL at build time.
       const { pipeline, env } = await (Function(`return import("${libUrl}")`)() as Promise<any>);
 
@@ -65,9 +76,9 @@ export class EmbeddingService {
         // Self-hosted, no network: model + wasm come from our own origin.
         env.allowLocalModels  = true;
         env.allowRemoteModels = false;
-        env.localModelPath    = EmbeddingService.LOCAL_MODEL;
+        env.localModelPath    = `${base}models/`;
         if (env.backends?.onnx?.wasm) {
-          env.backends.onnx.wasm.wasmPaths = EmbeddingService.LOCAL_WASM;
+          env.backends.onnx.wasm.wasmPaths = `${base}vendor/transformers/`;
           // Single-threaded: threaded WASM needs cross-origin isolation (SAB) we
           // don't enable; this also means we only ship the non-threaded binaries.
           env.backends.onnx.wasm.numThreads = 1;
