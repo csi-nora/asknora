@@ -15,6 +15,8 @@ also removes all CORS problems.
 | `/streamlit/`        | `streamlit:8501`              | Dashboard (baseUrlPath=streamlit)          |
 | `/qdrant/`           | `qdrant:6333`                 | Vector DB (debug/direct access)            |
 | `/chroma/`           | `chroma:8000`                 | Vector DB (debug/direct access)            |
+| `/models/`           | static (SPA dist)             | Self-hosted embedding model (offline dense vectors) |
+| `/vendor/`           | static (SPA dist)             | transformers.js + ORT WASM + pdf.js (offline runtime) |
 | `/healthz`           | nginx                         | Proxy liveness probe                       |
 
 In **prod** everything is containerized on the `ai-ecosystem-sandbox-net`
@@ -194,6 +196,37 @@ streamlit run dashboard/app_lite.py --server.baseUrlPath=streamlit --server.port
 
 The `--server.baseUrlPath=streamlit` flag is required so Streamlit generates its
 asset/websocket URLs under `/streamlit/`.
+
+## Offline / air-gapped embeddings (dense vectors with no internet)
+
+The CSI Nora KB embeds documents with `Xenova/all-MiniLM-L6-v2` via
+transformers.js. To make this work on an **isolated VM with no internet**, the
+model, the onnxruntime-web WASM backend, and pdf.js are **vendored into
+`csi-nora-v2/public/`** and therefore ship in the Angular `dist` and are served
+by this proxy **same-origin** under `/models/` and `/vendor/`:
+
+- `EmbeddingService` loads **local-first** (`allowLocalModels`, `localModelPath=/models/`,
+  `wasmPaths=/vendor/transformers/`, single-threaded WASM) and only falls back to
+  the public CDN if the local assets are missing — so the online path still works.
+- Uploaded docs then show **`dense + BM25 ✓`** and the RAG panel shows
+  **`Model source: self-hosted ✓`**. If assets are absent it shows the amber
+  **`BM25 only ⓘ`** tag with a tooltip explaining the offline/CDN cause.
+
+Vendor the assets once (on a machine **with** internet) so they travel with the
+bundle (~44 MB total):
+
+```powershell
+# Windows
+.\scripts\fetch-embedding-model.ps1
+```
+```bash
+# Linux / macOS
+./scripts/fetch-embedding-model.sh
+```
+
+Then `npm run build` (or the `start_proxy` / `start-linux` launchers) picks them up.
+`.onnx`/`.wasm` are committed as binary (see repo `.gitattributes`); the only
+remaining online asset is the cosmetic Google Fonts stylesheet.
 
 ## Notes & troubleshooting
 

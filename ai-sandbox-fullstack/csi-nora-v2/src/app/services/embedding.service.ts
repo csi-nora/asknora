@@ -1,10 +1,28 @@
 import { Injectable, signal } from '@angular/core';
 import { EmbedStatus } from '../models';
 
+/**
+ * Dense-embedding service (Xenova/all-MiniLM-L6-v2 via transformers.js).
+ *
+ * OFFLINE-FIRST: it loads the runtime, WASM backend and model from the SAME
+ * origin (vendored under /vendor/transformers and /models by the Angular build),
+ * so it works on an air-gapped VM with NO internet. If the local assets are
+ * missing (e.g. a dev build that didn't run scripts/fetch-embedding-model), it
+ * gracefully falls back to the public CDN so the online path still works.
+ */
 @Injectable({ providedIn: 'root' })
 export class EmbeddingService {
   status   = signal<EmbedStatus>('idle');
   progress = signal<number>(0);
+  /** Which source actually loaded the model: 'local' (offline) | 'remote' (CDN) | null */
+  source   = signal<'local' | 'remote' | null>(null);
+
+  /** Same-origin vendored assets (shipped in the Angular dist via public/). */
+  private static readonly LOCAL_LIB   = '/vendor/transformers/transformers.min.js';
+  private static readonly LOCAL_WASM  = '/vendor/transformers/';
+  private static readonly LOCAL_MODEL = '/models/';
+  private static readonly REMOTE_LIB  = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1';
+  private static readonly MODEL_ID    = 'Xenova/all-MiniLM-L6-v2';
 
   private _pipe: any = null;
   private _loading = false;
@@ -27,31 +45,54 @@ export class EmbeddingService {
     this.progress.set(0);
 
     try {
-      // Dynamic CDN import (avoid TS resolving the URL as a module path)
-      const cdn = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1';
-      const { pipeline, env } = await (Function(`return import("${cdn}")`)() as Promise<any>);
-      env.allowLocalModels = false;
-      env.useBrowserCache  = true;
-
-      this._pipe = await pipeline(
-        'feature-extraction',
-        'Xenova/all-MiniLM-L6-v2',
-        {
-          quantized: true,
-          progress_callback: (p: any) => {
-            if (p?.progress != null) this.progress.set(Math.round(p.progress));
-          }
-        }
-      );
-      this.status.set('ready');
-      this.progress.set(100);
-      return true;
-    } catch (e) {
-      console.warn('[Embeddings] Load failed — using sparse-only mode:', e);
+      // Try same-origin vendored assets first (works fully offline), then CDN.
+      if (await this._tryLoad('local'))  return true;
+      if (await this._tryLoad('remote')) return true;
       this.status.set('error');
       return false;
     } finally {
       this._loading = false;
+    }
+  }
+
+  private async _tryLoad(mode: 'local' | 'remote'): Promise<boolean> {
+    try {
+      const libUrl = mode === 'local' ? EmbeddingService.LOCAL_LIB : EmbeddingService.REMOTE_LIB;
+      // Dynamic import via Function() so TS/Angular don't try to resolve the URL at build time.
+      const { pipeline, env } = await (Function(`return import("${libUrl}")`)() as Promise<any>);
+
+      if (mode === 'local') {
+        // Self-hosted, no network: model + wasm come from our own origin.
+        env.allowLocalModels  = true;
+        env.allowRemoteModels = false;
+        env.localModelPath    = EmbeddingService.LOCAL_MODEL;
+        if (env.backends?.onnx?.wasm) {
+          env.backends.onnx.wasm.wasmPaths = EmbeddingService.LOCAL_WASM;
+          // Single-threaded: threaded WASM needs cross-origin isolation (SAB) we
+          // don't enable; this also means we only ship the non-threaded binaries.
+          env.backends.onnx.wasm.numThreads = 1;
+        }
+      } else {
+        // Public CDN fallback (online machines / when local assets are absent).
+        env.allowLocalModels  = false;
+        env.allowRemoteModels = true;
+        env.useBrowserCache   = true;
+      }
+
+      this._pipe = await pipeline('feature-extraction', EmbeddingService.MODEL_ID, {
+        quantized: true,
+        progress_callback: (p: any) => {
+          if (p?.progress != null) this.progress.set(Math.round(p.progress));
+        }
+      });
+      this.status.set('ready');
+      this.progress.set(100);
+      this.source.set(mode);
+      console.info(`[Embeddings] Loaded MiniLM from ${mode === 'local' ? 'self-hosted (offline)' : 'CDN'}.`);
+      return true;
+    } catch (e) {
+      console.warn(`[Embeddings] ${mode} load failed:`, e);
+      return false;
     }
   }
 

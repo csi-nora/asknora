@@ -108,6 +108,31 @@ When it finishes you'll see:
 
 ---
 
+## 4B) Offline / air-gapped embeddings (dense vectors with NO internet)
+
+The Knowledge Base uses a dense-embedding model (`Xenova/all-MiniLM-L6-v2`) for
+hybrid (dense + BM25) retrieval. The deploy bundle **ships this model, its WASM
+runtime, and pdf.js vendored under `csi-nora-v2/public/`**, served same-origin by
+nginx — so **document embedding works fully offline** on an isolated VM. When the
+model is self-hosted, uploaded docs show **`dense + BM25 ✓`** and the RAG panel
+reports **`Model source: self-hosted ✓`**.
+
+If you cloned/copied a bundle **without** the vendored assets (they're large,
+~44 MB), the app will fall back to keyword-only search and docs will show the
+amber **`BM25 only ⓘ`** tag. To vendor them once, on a machine **with internet**:
+
+```bash
+cd ai-ecosystem-sandbox
+./scripts/fetch-embedding-model.sh      # downloads model + WASM + pdf.js into ../csi-nora-v2/public
+cd ../csi-nora-v2 && npm run build       # (or re-run ./scripts/start-linux.sh)
+```
+
+> The only remaining online asset is the Google Fonts stylesheet (cosmetic); if
+> blocked, the UI simply falls back to system fonts. All KB/RAG functionality is
+> offline-capable.
+
+---
+
 ## 5) Running on BOTH platforms at once
 
 With Bridged mode you get two fully independent instances on the same LAN:

@@ -23,6 +23,9 @@
             "inlineStyleLanguage": "scss",
             "styles": ["src/styles.scss"],
             "scripts": [],
+            "assets": [
+              { "glob": "**/*", "input": "public", "output": "." }
+            ],
             "allowedCommonJsDependencies": ["pdfjs-dist"]
           },
           "configurations": {

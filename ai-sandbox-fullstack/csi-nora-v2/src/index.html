@@ -9,9 +9,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
   <!-- Client-side PDF text extraction (used by DocumentService for KB uploads).
+       Self-hosted (same origin) so PDF ingestion works fully offline / air-gapped.
        Classic script loads before the deferred Angular module, so window.pdfjsLib
        is defined by the time DocumentService is constructed. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="/vendor/pdfjs/pdf.min.js"></script>
 </head>
 <body>
   <app-root></app-root>

@@ -24,8 +24,8 @@ export class DocumentService {
    *  library isn't present yet (we retry lazily right before parsing). */
   private _configurePdfWorker(): void {
     if (typeof pdfjsLib !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      // Self-hosted (same origin) so PDF parsing works fully offline / air-gapped.
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js';
     }
   }
 

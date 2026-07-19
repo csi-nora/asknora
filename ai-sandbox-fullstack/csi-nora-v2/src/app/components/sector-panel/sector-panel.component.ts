@@ -45,9 +45,21 @@ import { Sensitivity } from '../../models';
       <span style="color:var(--dim)">Dense vectors</span>
       <span style="color:var(--green)">{{ rag.indexedChunks }} ✓</span>
     </div>
+    <div *ngIf="rag.indexedChunks > 0 && embedSvc.source()" class="rag-mini-row"
+         [title]="embedSvc.source()==='local' ? 'Embedding model is served from this deployment (works offline / air-gapped).' : 'Embedding model was loaded from the public CDN (requires internet).'">
+      <span style="color:var(--dim)">Model source</span>
+      <span [style.color]="embedSvc.source()==='local' ? 'var(--green)' : 'var(--dim)'">
+        {{ embedSvc.source()==='local' ? 'self-hosted ✓' : 'CDN' }}
+      </span>
+    </div>
     <div *ngIf="embedSvc.status()==='loading'" class="embed-progress" style="margin:4px 0;padding:4px 8px">
       <div class="embed-spinner"></div>
       <span>Embedding {{ embedSvc.progress() }}%</span>
+    </div>
+    <div *ngIf="embedSvc.status()==='error'" class="rag-mini-row embed-warn"
+         title="The dense-embedding model couldn't load (no network and no self-hosted assets). Retrieval falls back to keyword-only BM25. Vendor the model with scripts/fetch-embedding-model to enable offline dense search.">
+      <span>⚠️ Keyword-only</span>
+      <span>dense model offline</span>
     </div>
     <div *ngIf="kb.overflow()" class="rag-mini-row kb-overflow" title="KB exceeded the ~5 MB browser storage budget and was automatically moved to the larger persistent store (IndexedDB).">
       <span>💾 Persistent store</span>
@@ -86,8 +98,12 @@ import { Sensitivity } from '../../models';
         <div class="dm">{{ docSvc.fmtSize(d.size) }} · {{ d.type.toUpperCase() }}</div>
         <div class="dm" *ngIf="d.chunkCount">
           {{ d.chunkCount }} chunks
-          <span *ngIf="d.indexed" style="color:var(--green)"> · indexed ✓</span>
-          <span *ngIf="!d.indexed" style="color:var(--amber)"> · BM25 only</span>
+          <span *ngIf="d.indexed" style="color:var(--green)"
+                title="Dense embeddings (MiniLM) + BM25 keyword search are both active for this document (hybrid retrieval).">
+            · dense + BM25 ✓</span>
+          <span *ngIf="!d.indexed" style="color:var(--amber);cursor:help"
+                title="Dense embeddings didn't load — the app couldn't reach the embedding model (offline / CDN blocked) and no self-hosted copy was found, so this document is searched with keyword BM25 only. Run scripts/fetch-embedding-model once to vendor the model for offline dense vectors.">
+            · BM25 only ⓘ</span>
         </div>
         <span class="si" [ngClass]="'si-'+d.sensitivity">{{ d.sensitivity.toUpperCase() }}</span>
       </div>
@@ -118,6 +134,7 @@ import { Sensitivity } from '../../models';
       border-radius:8px;font-size:10px;margin:2px 0}
     .rag-mini-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
     .kb-overflow{margin-top:4px;padding-top:4px;border-top:1px solid rgba(59,130,246,.15);color:var(--green)}
+    .embed-warn{margin-top:4px;padding-top:4px;border-top:1px solid rgba(245,158,11,.2);color:var(--amber);cursor:help}
     .upload-zone{border:1.5px dashed var(--border);border-radius:10px;padding:12px;text-align:center;
       cursor:pointer;transition:.2s;margin:4px 0;
       &:hover,.dragover{border-color:var(--border-a);background:rgba(224,0,26,.04)}}

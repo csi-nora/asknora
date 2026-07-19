@@ -11,3 +11,9 @@
 
 # Shell scripts must be LF (or they fail with "bad interpreter" on Linux).
 *.sh text eol=lf
+
+# Vendored offline embedding assets — treat as binary (no EOL/text munging).
+# These ship the air-gapped dense-embedding model + runtime under
+# csi-nora-v2/public/ so the KB embeds documents with no internet.
+*.onnx binary
+*.wasm binary
