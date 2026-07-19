@@ -46,6 +46,12 @@ fi
 
 chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
 
+# ── Clear any leftover/orphaned containers from a previous run ───────────────
+# Prevents "Bind for 0.0.0.0:<port> failed: port is already allocated" when a
+# prior partial start left containers behind.
+echo "==> Clearing any previous stack containers (safe if none exist)..."
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml down --remove-orphans >/dev/null 2>&1 || true
+
 # ── Start the stack via the existing production launcher ─────────────────────
 echo "==> Starting CSI Nora full stack on port ${PORT} (build=${SKIP_BUILD:-0 -> yes}) ..."
 SKIP_BUILD="${SKIP_BUILD:-0}" PROXY_HTTP_PORT="$PORT" ./scripts/start_proxy.sh

@@ -47,10 +47,13 @@ services:
       dockerfile: apps/nora_bridge/Dockerfile
     container_name: sandbox-nora-bridge
     restart: unless-stopped
-    ports:
-      # Loopback only — the bridge is reached via the proxy (/sandbox) on the Docker
-      # network; it must NOT be directly reachable from the LAN.
-      - "127.0.0.1:${BRIDGE_HOST_PORT:-8090}:8090"
+    # No host port published on purpose. The bridge is an internal BFF reached only
+    # through the reverse proxy at /sandbox (nginx -> http://nora-bridge:8090 on the
+    # Docker network). Publishing a host port here served no purpose and caused
+    # "Bind for 0.0.0.0:8090 failed: port is already allocated" when 8090 was taken
+    # by a leftover container. `expose` keeps it reachable inside the network only.
+    expose:
+      - "8090"
     env_file:
       - path: .env
         required: false

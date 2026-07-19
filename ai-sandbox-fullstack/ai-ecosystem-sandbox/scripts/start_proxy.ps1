@@ -41,7 +41,7 @@ try {
             throw "Built SPA not found at $dist. Run without -SkipBuild, or check the Angular outputPath."
         }
         Write-Host "Starting full stack (prod: infra + bridge + streamlit + proxy)..." -ForegroundColor Cyan
-        docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
+        docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build --remove-orphans
     }
     else {
         Write-Host "Starting reverse proxy (dev, proxies to ng serve :4200)..." -ForegroundColor Cyan
