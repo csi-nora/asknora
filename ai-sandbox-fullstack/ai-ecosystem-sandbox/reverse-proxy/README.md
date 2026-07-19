@@ -11,7 +11,7 @@ also removes all CORS problems.
 |----------------------|-------------------------------|------------------------------------------|
 | `/`                  | CSI Nora SPA (static)         | Angular client-side routing (SPA fallback) |
 | `/ollama/`           | `ollama:11434`                | OpenAI-compatible LLM API, token streaming |
-| `/sandbox/`          | `nora-bridge:8090`            | FastAPI bridge (guardrails + device scale) |
+| `/sandbox/`          | `nora-bridge:8090`            | FastAPI bridge (guardrails + device scale + **server-side KB** at `/sandbox/kb/*`) |
 | `/streamlit/`        | `streamlit:8501`              | Dashboard (baseUrlPath=streamlit)          |
 | `/qdrant/`           | `qdrant:6333`                 | Vector DB (debug/direct access)            |
 | `/chroma/`           | `chroma:8000`                 | Vector DB (debug/direct access)            |
@@ -228,6 +228,71 @@ bundle (~44 MB total):
 Then `npm run build` (or the `start_proxy` / `start-linux` launchers) picks them up.
 `.onnx`/`.wasm` are committed as binary (see repo `.gitattributes`); the only
 remaining online asset is the cosmetic Google Fonts stylesheet.
+
+## Server-side, disk-backed Knowledge Base (persists on the host)
+
+By default the KB is now **disk-backed on the host** via the sandbox's existing
+Dockerized stores, so it is effectively unlimited, **shared across every browser
+and device** hitting this deployment, and it **survives browser clearing AND
+`docker compose down` / reboots**. The browser-side store remains an automatic
+**offline fallback** (e.g. the static GitHub Pages demo, or when the bridge is down).
+
+**How it works**
+
+- The Angular app probes `GET /sandbox/kb/health` on startup. If Postgres **and**
+  Qdrant are reachable it runs in **server mode** (sidebar shows `🗄️ KB: Server
+  (disk)`); otherwise it falls back to **browser mode** (`🌐 KB: Browser`).
+- On upload it chunks + embeds each document **client-side** (self-hosted MiniLM,
+  384-dim) and POSTs `{chunks + vectors}` to the bridge. Retrieval calls
+  `POST /sandbox/kb/query` (dense from Qdrant + sparse from Postgres full-text,
+  fused with RRF on the server) — citations look identical to browser mode.
+
+**KB API (bridge, reached via the proxy at `/sandbox/kb`)**
+
+| Method & path                     | Purpose                                             |
+|-----------------------------------|-----------------------------------------------------|
+| `GET  /sandbox/kb/health`         | store status + `docCount` / `chunkCount` / `vectorCount` |
+| `GET  /sandbox/kb/documents`      | list docs (shared registry)                         |
+| `POST /sandbox/kb/documents`      | ingest doc: registry + chunk text + dense vectors   |
+| `DELETE /sandbox/kb/documents/{id}` | remove doc + its chunks + vectors                 |
+| `POST /sandbox/kb/query`          | hybrid retrieve (dense + sparse + RRF, top-K)       |
+
+**Where the data physically lives (named Docker volumes on the host disk)**
+
+| Store    | Container         | Volume                                   | In-container path            | Holds |
+|----------|-------------------|------------------------------------------|------------------------------|-------|
+| Qdrant   | `sandbox-qdrant`  | `ai-ecosystem-sandbox_qdrant_data`       | `/qdrant/storage`            | dense vectors (collection `csinora_kb`, 384-d cosine) |
+| Postgres | `sandbox-postgres`| `ai-ecosystem-sandbox_postgres_data`     | `/var/lib/postgresql/data`   | doc registry + chunk text + full-text (`kb.documents`, `kb.chunks`) |
+
+Find the real host paths:
+```bash
+docker volume inspect ai-ecosystem-sandbox_qdrant_data ai-ecosystem-sandbox_postgres_data --format '{{.Name}} -> {{.Mountpoint}}'
+```
+(On Docker Desktop / WSL2 these live inside the Docker VM under
+`\\wsl$\docker-desktop-data\...`; on native Linux under `/var/lib/docker/volumes/...`.)
+
+**Inspect / verify**
+```bash
+curl http://localhost:9090/sandbox/kb/health
+docker exec sandbox-postgres psql -U sandbox -d ai_sandbox -c "SELECT count(*) FROM kb.documents; SELECT count(*) FROM kb.chunks;"
+curl http://localhost:9090/qdrant/collections/csinora_kb   # points_count
+```
+
+**Back it up** (stop-free logical backups):
+```bash
+docker exec sandbox-postgres pg_dump -U sandbox -d ai_sandbox -n kb > kb_pg_backup.sql
+docker run --rm -v ai-ecosystem-sandbox_qdrant_data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/qdrant_data_backup.tgz -C /data .
+```
+
+**Reset the KB** (wipe all server-side docs/vectors):
+```bash
+docker exec sandbox-postgres psql -U sandbox -d ai_sandbox -c "TRUNCATE kb.chunks, kb.documents CASCADE;"
+curl -X DELETE http://localhost:9090/qdrant/collections/csinora_kb   # recreated automatically on next ingest
+```
+> A normal `docker compose ... down` keeps the KB. Only `down -v` deletes the
+> volumes (and the KB). To force browser-only mode, stop the bridge/DBs — the app
+> falls back automatically.
 
 ## Notes & troubleshooting
 

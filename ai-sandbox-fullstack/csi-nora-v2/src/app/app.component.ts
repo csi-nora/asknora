@@ -7,6 +7,7 @@ import { AuditService }   from './services/audit.service';
 import { ApiService }     from './services/api.service';
 import { RagService }     from './services/rag.service';
 import { KbStorageService } from './services/kb-storage.service';
+import { KbBackendService } from './services/kb-backend.service';
 import { SECTORS }        from './data/sectors.data';
 import { HeaderComponent }      from './components/header/header.component';
 import { SectorPanelComponent } from './components/sector-panel/sector-panel.component';
@@ -54,6 +55,7 @@ export class AppComponent implements OnInit, OnDestroy {
     private api: ApiService,
     private rag: RagService,
     private kb:  KbStorageService,
+    private kbBackend: KbBackendService,
   ) {}
 
   ngOnInit() {
@@ -69,10 +71,26 @@ export class AppComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Load the self-hosted embedding model at startup when persisted dense
-    // vectors exist, so retrieval stays DENSE after a browser restart (docs keep
-    // "dense + BM25", not "BM25 only") without any manual re-index. Non-blocking.
-    this.rag.ready().then(() => this.rag.warmUpEmbeddings());
+    // Detect the disk-backed server KB (bridge reachable) vs browser fallback.
+    // Server mode: the KB lives on the host (Qdrant + Postgres), shared across
+    // browsers/devices and surviving restarts — so the doc list is loaded FROM
+    // the server (source of truth). Browser mode (e.g. static GitHub Pages demo,
+    // or bridge down): fall back to the local store and restore dense vectors.
+    this.kbBackend.probe().then(async isServer => {
+      if (isServer) {
+        try {
+          const docs = await this.kbBackend.listDocs();
+          this.st.setDocs(docs);
+        } catch (e) { console.warn('[KB] server list failed; keeping local docs', e); }
+        this.kbBackend.refreshStats();
+        this.rag.preloadEmbedder();   // warm the embedder for fast first query
+      } else {
+        // Load the self-hosted embedding model at startup when persisted dense
+        // vectors exist, so retrieval stays DENSE after a browser restart (docs keep
+        // "dense + BM25", not "BM25 only") without any manual re-index. Non-blocking.
+        this.rag.ready().then(() => this.rag.warmUpEmbeddings());
+      }
+    });
 
     // Auto-save on any message/doc change
     combineLatest([this.st.messages$, this.st.docs$])

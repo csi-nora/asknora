@@ -22,17 +22,36 @@ sys.path.insert(0, str(ROOT))
 
 from src.providers.device import apply_accel_env, ollama_num_gpu, resolve_device, status_report
 from src.providers.guardrails import guard_input, guard_output
+from apps.nora_bridge.kb import router as kb_router, ensure_ready as kb_ensure_ready
 
 OLLAMA = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 DEFAULT_MODEL = os.getenv("LLM_MODEL_OLLAMA", "llama3.2:1b")
 
-app = FastAPI(title="CSI Nora Sandbox Bridge", version="1.0.0")
+app = FastAPI(title="CSI Nora Sandbox Bridge", version="1.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:4200", "http://127.0.0.1:4200", "*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Server-side, disk-backed Knowledge Base (Qdrant + Postgres). Reached through the
+# reverse proxy at /sandbox/kb/*. See apps/nora_bridge/kb.py.
+app.include_router(kb_router)
+
+
+@app.on_event("startup")
+def _bootstrap_kb() -> None:
+    """Create the Postgres schema + Qdrant collection on boot (best-effort).
+
+    Runs even on an already-populated volume where postgres init.sql won't re-run.
+    Doesn't block startup if a store isn't up yet — endpoints bootstrap lazily too.
+    """
+    try:
+        kb_ensure_ready()
+        print("[kb] stores bootstrapped (Postgres schema + Qdrant collection ready).")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[kb] deferred bootstrap (stores not ready yet): {exc}")
 
 Accel = Literal["auto", "cpu", "gpu", "npu"]
 

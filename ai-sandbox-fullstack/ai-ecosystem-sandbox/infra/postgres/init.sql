@@ -35,3 +35,33 @@ CREATE TABLE IF NOT EXISTS sandbox.agent_memory (
 
 CREATE INDEX IF NOT EXISTS idx_agent_memory_session
     ON sandbox.agent_memory (session_id, created_at);
+
+-- ── CSI Nora server-side, disk-backed Knowledge Base ────────────────────────────
+-- Doc registry + chunk text + full-text (sparse) live here; dense vectors live in
+-- Qdrant (collection csinora_kb). The bridge also creates these at runtime
+-- (CREATE ... IF NOT EXISTS) so it works on volumes created before this file.
+CREATE SCHEMA IF NOT EXISTS kb;
+
+CREATE TABLE IF NOT EXISTS kb.documents (
+    doc_id      TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    type        TEXT,
+    size        BIGINT DEFAULT 0,
+    sensitivity TEXT DEFAULT 'internal',
+    content     TEXT DEFAULT '',
+    chunk_count INT  DEFAULT 0,
+    indexed     BOOLEAN DEFAULT FALSE,
+    uploaded_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS kb.chunks (
+    chunk_id    TEXT PRIMARY KEY,
+    doc_id      TEXT NOT NULL REFERENCES kb.documents(doc_id) ON DELETE CASCADE,
+    doc_name    TEXT,
+    content     TEXT NOT NULL,
+    sensitivity TEXT DEFAULT 'internal',
+    tsv         TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
+);
+
+CREATE INDEX IF NOT EXISTS idx_kb_chunks_tsv ON kb.chunks USING GIN (tsv);
+CREATE INDEX IF NOT EXISTS idx_kb_chunks_doc ON kb.chunks (doc_id);

@@ -183,6 +183,28 @@ static IP** for the host (the app binds `0.0.0.0` and follows the DHCP IP).
 | Autostart task | `Get-ScheduledTask -TaskName "CSI Nora Stack Autostart"` → `Ready` |
 | Firewall rule | `Get-NetFirewallRule -DisplayName "CSI Nora Demo (TCP 9090)"` |
 | Qdrant | `curl http://127.0.0.1:6333/readyz` |
+| Server KB | `curl http://localhost:9090/sandbox/kb/health` → `docCount`/`chunkCount`/`vectorCount` |
+
+## 7B. Knowledge Base — server-side, disk-backed (default)
+
+KB uploads persist **on the host disk** via Qdrant (dense vectors) + Postgres
+(registry + chunk text + full-text), so the KB is effectively unlimited, **shared
+across browsers/devices**, and **survives browser clearing, `docker compose down`,
+and reboots**. If the bridge/DBs are unreachable (e.g. static GitHub Pages demo),
+the app falls back to a **browser-local** KB automatically — the sidebar shows
+`🗄️ KB: Server (disk)` vs `🌐 KB: Browser`.
+
+- **Data location:** named volumes `ai-ecosystem-sandbox_qdrant_data`
+  (`/qdrant/storage`, collection `csinora_kb`) and `ai-ecosystem-sandbox_postgres_data`
+  (`/var/lib/postgresql/data`, tables `kb.documents` / `kb.chunks`). Inspect with
+  `docker volume inspect <name> --format '{{.Mountpoint}}'`.
+- **Back up:** `docker exec sandbox-postgres pg_dump -U sandbox -d ai_sandbox -n kb > kb.sql`
+  and tar the `qdrant_data` volume.
+- **Reset:** `docker exec sandbox-postgres psql -U sandbox -d ai_sandbox -c "TRUNCATE kb.chunks, kb.documents CASCADE;"`
+  then `curl -X DELETE http://localhost:9090/qdrant/collections/csinora_kb`.
+- **Keep the KB across restarts:** use `docker compose ... down` (NOT `down -v`).
+
+Full API + backup/reset details: `ai-ecosystem-sandbox/reverse-proxy/README.md`.
 
 ## Troubleshooting
 

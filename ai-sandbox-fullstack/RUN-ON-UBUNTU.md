@@ -267,6 +267,46 @@ python apps/mcp_server/smoke_test.py         # proves it lists tools + runs calc
 
 ---
 
+## 9) Knowledge Base — where your uploads live (server-side, disk-backed)
+
+Uploaded KB documents are stored **on the VM's disk** via the stack's existing
+Qdrant + Postgres containers (named Docker volumes), so the KB is effectively
+unlimited, **shared across every browser/device** that opens the app, and it
+**survives browser clearing, `docker compose down`, and VM reboots**. If the
+bridge/DBs aren't reachable the app automatically falls back to a **browser-local**
+KB (the sidebar shows `🗄️ KB: Server (disk)` vs `🌐 KB: Browser`).
+
+```bash
+cd ai-ecosystem-sandbox
+
+# Prove it's server-backed (docCount / chunkCount / vectorCount > 0 after uploads)
+curl http://localhost:9090/sandbox/kb/health
+
+# Where the data physically lives on the VM disk:
+docker volume inspect ai-ecosystem-sandbox_qdrant_data ai-ecosystem-sandbox_postgres_data \
+  --format '{{.Name}} -> {{.Mountpoint}}'
+#   qdrant_data   -> /var/lib/docker/volumes/ai-ecosystem-sandbox_qdrant_data/_data     (dense vectors, collection csinora_kb)
+#   postgres_data -> /var/lib/docker/volumes/ai-ecosystem-sandbox_postgres_data/_data   (kb.documents + kb.chunks)
+```
+
+**Back up:**
+```bash
+docker exec sandbox-postgres pg_dump -U sandbox -d ai_sandbox -n kb > kb_pg_backup.sql
+docker run --rm -v ai-ecosystem-sandbox_qdrant_data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/qdrant_data_backup.tgz -C /data .
+```
+
+**Reset (wipe the KB):**
+```bash
+docker exec sandbox-postgres psql -U sandbox -d ai_sandbox -c "TRUNCATE kb.chunks, kb.documents CASCADE;"
+curl -X DELETE http://localhost:9090/qdrant/collections/csinora_kb   # recreated on next ingest
+```
+
+> `docker compose ... down` keeps the KB (volumes persist). Only `down -v` deletes it.
+> Full API + backup details: `ai-ecosystem-sandbox/reverse-proxy/README.md`.
+
+---
+
 ## Security note
 
 Bridged + LAN exposure means **anyone on the network can reach the demo and drive the local

@@ -63,9 +63,17 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       LLM_MODEL_OLLAMA: ${DEFAULT_OLLAMA_MODEL:-llama3.2:1b}
       ACCEL_DEVICE: ${ACCEL_DEVICE:-auto}
+      # Server-side, disk-backed Knowledge Base stores (persist on named volumes).
+      QDRANT_URL: http://qdrant:6333
+      KB_QDRANT_COLLECTION: ${KB_QDRANT_COLLECTION:-csinora_kb}
+      POSTGRES_DSN: postgresql://${POSTGRES_USER:-sandbox}:${POSTGRES_PASSWORD:-sandbox_dev_password}@postgres:5432/${POSTGRES_DB:-ai_sandbox}
     depends_on:
       ollama:
         condition: service_started
+      qdrant:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8090/healthz >/dev/null || exit 1"]
       interval: 15s

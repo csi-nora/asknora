@@ -6,6 +6,7 @@ import { AuditService }     from '../../services/audit.service';
 import { RagService }       from '../../services/rag.service';
 import { EmbeddingService } from '../../services/embedding.service';
 import { KbStorageService } from '../../services/kb-storage.service';
+import { KbBackendService } from '../../services/kb-backend.service';
 import { SECTORS, SECTOR_KEYS } from '../../data/sectors.data';
 import { Sensitivity } from '../../models';
 
@@ -36,16 +37,21 @@ import { Sensitivity } from '../../models';
   </div>
 
   <!-- RAG status mini bar -->
-  <div class="rag-mini" *ngIf="rag.totalChunks > 0">
+  <div class="rag-mini" *ngIf="kbChunks > 0 || srv">
+    <div class="rag-mini-row kb-backing"
+         [title]="srv ? 'Knowledge Base is stored on the HOST disk via Qdrant (vectors) + Postgres (registry + full-text). Shared across browsers/devices, and it survives browser clearing AND container/host restarts.' : 'Knowledge Base is stored in THIS browser (localStorage, auto-scaling to IndexedDB). Private to this browser profile. The disk-backed server KB was not reachable.'">
+      <span [style.color]="srv ? 'var(--green)' : 'var(--dim)'">{{ srv ? '🗄️ KB: Server (disk)' : '🌐 KB: Browser' }}</span>
+      <span [style.color]="srv ? 'var(--green)' : 'var(--dim)'">{{ srv ? 'shared ✓' : 'local' }}</span>
+    </div>
     <div class="rag-mini-row">
       <span style="color:var(--blue)">🧠 RAG Index</span>
-      <span style="color:var(--dim)">{{ rag.totalChunks }} chunks</span>
+      <span style="color:var(--dim)">{{ kbChunks }} chunks</span>
     </div>
-    <div *ngIf="rag.indexedChunks > 0" class="rag-mini-row">
+    <div *ngIf="kbVectors > 0" class="rag-mini-row">
       <span style="color:var(--dim)">Dense vectors</span>
-      <span style="color:var(--green)">{{ rag.indexedChunks }} ✓</span>
+      <span style="color:var(--green)">{{ kbVectors }} ✓</span>
     </div>
-    <div *ngIf="rag.indexedChunks > 0 && embedSvc.source()" class="rag-mini-row"
+    <div *ngIf="kbVectors > 0 && embedSvc.source()" class="rag-mini-row"
          [title]="embedSvc.source()==='local' ? 'Embedding model is served from this deployment (works offline / air-gapped).' : 'Embedding model was loaded from the public CDN (requires internet).'">
       <span style="color:var(--dim)">Model source</span>
       <span [style.color]="embedSvc.source()==='local' ? 'var(--green)' : 'var(--dim)'">
@@ -61,7 +67,7 @@ import { Sensitivity } from '../../models';
       <span>⚠️ Keyword-only</span>
       <span>dense model offline</span>
     </div>
-    <div *ngIf="kb.overflow()" class="rag-mini-row kb-overflow" title="KB exceeded the ~5 MB browser storage budget and was automatically moved to the larger persistent store (IndexedDB).">
+    <div *ngIf="kb.overflow() && !srv" class="rag-mini-row kb-overflow" title="KB exceeded the ~5 MB browser storage budget and was automatically moved to the larger persistent store (IndexedDB).">
       <span>💾 Persistent store</span>
       <span>IndexedDB{{ kb.persisted() ? ' · pinned' : '' }}</span>
     </div>
@@ -133,6 +139,7 @@ import { Sensitivity } from '../../models';
     .rag-mini{padding:6px 8px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);
       border-radius:8px;font-size:10px;margin:2px 0}
     .rag-mini-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+    .kb-backing{margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid rgba(59,130,246,.15);font-weight:600}
     .kb-overflow{margin-top:4px;padding-top:4px;border-top:1px solid rgba(59,130,246,.15);color:var(--green)}
     .embed-warn{margin-top:4px;padding-top:4px;border-top:1px solid rgba(245,158,11,.2);color:var(--amber);cursor:help}
     .upload-zone{border:1.5px dashed var(--border);border-radius:10px;padding:12px;text-align:center;
@@ -175,7 +182,14 @@ export class SectorPanelComponent {
     public rag: RagService,
     public embedSvc: EmbeddingService,
     public kb: KbStorageService,
+    public kbBackend: KbBackendService,
   ) {}
+
+  /** True when the disk-backed server KB (bridge) is the active backing. */
+  get srv() { return this.kbBackend.isServer; }
+  /** Chunk/vector counts from the active backing (rag getters are server-aware). */
+  get kbChunks()  { return this.rag.totalChunks; }
+  get kbVectors() { return this.rag.indexedChunks; }
 
   pick(k: string) {
     this.st.sector.set(k);
