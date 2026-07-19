@@ -86,3 +86,12 @@ services:
       - --server.enableCORS=false
       - --server.enableXsrfProtection=false
       - --browser.gatherUsageStats=false
+    # Override the base healthcheck: with --server.baseUrlPath=streamlit the health
+    # endpoint moves under /streamlit/, so the default /_stcore/health probe 404s
+    # and marks the container unhealthy even though it is serving fine.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8501/streamlit/_stcore/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
