@@ -348,13 +348,20 @@ export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
       const { reply, mode, ragChunks } = await this.api.send(text, this.st.sector()||'sme', this.st.docs);
       const sources = ragChunks.length ? [...new Set(ragChunks.map(r=>r.chunk.docName))] : [];
       this._addMsg({ role:'nora', content: reply, docSources: sources, apiMode: mode, ragChunks });
+      // Keep the mode bar in sync with what actually happened for this message.
+      this.st.hybridMode.set(mode === 'hybrid' ? 'hybrid' : 'local');
       this.au.log(mode==='hybrid'?'Hybrid RAG Response':'Local Response',
                   `${SECTORS[this.st.sector()||'sme'].name} · ${ragChunks.length} chunks`,
                   this.st.sensitivity());
     } catch (err: any) {
+      // A transient LLM/network error must NOT trap the app in Local mode while the
+      // stack is healthy: serve an offline answer for THIS message only, and force a
+      // fresh health probe on the next send so it recovers automatically. We do NOT
+      // pin api.health='offline' (the dedicated /ollama probe + poll own that).
       const fallback = this.api['_localAnswer']?.(text, this.st.sector()||'sme', this.st.docs) || 'Error: ' + err.message;
-      this._addMsg({ role:'nora', content: `⚠️ API error — using local KB:\n\n${fallback}`, apiMode:'local', ragChunks:[] });
-      this.api.health.set('offline'); this.st.hybridMode.set('local');
+      this._addMsg({ role:'nora', content: `⚠️ Couldn't reach the model — showing an offline answer:\n\n${fallback}`, apiMode:'local', ragChunks:[] });
+      this.st.hybridMode.set('local');
+      this.api.lastChecked = 0;
     } finally {
       this.st.isLoading.set(false);
     }

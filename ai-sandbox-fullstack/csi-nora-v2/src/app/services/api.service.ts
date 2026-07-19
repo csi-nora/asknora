@@ -99,7 +99,11 @@ export class ApiService {
     docs:      KbDocument[],
   ): Promise<{ reply: string; mode: HybridMode; ragChunks: RetrievedChunk[] }> {
 
-    const online = await this.checkHealth();
+    // Re-probe whenever we're not already CONFIRMED online, so a stale/transient
+    // 'offline' never traps the session in Local mode while the stack is actually
+    // up. Successes are still cached for TTL, so a healthy session doesn't re-probe
+    // on every message — but recovery from a hiccup is immediate.
+    const online = await this.checkHealth(this.health() !== 'online');
     if (!online) {
       return { reply: this._localAnswer(query, sectorKey, docs), mode: 'local', ragChunks: [] };
     }
@@ -139,11 +143,11 @@ export class ApiService {
   private _localAnswer(query: string, sectorKey: string, docs: KbDocument[]): string {
     const s = SECTORS[sectorKey] || SECTORS['sme'];
     const chunks = this._kbSearch(query, sectorKey);
-    let ans = `*[Offline — Local Knowledge Repository]*\n\n`;
+    let ans = `*[Offline — Local Knowledge Base]*\n\n`;
     ans += `**${s.name}** knowledge base:\n\n`;
     chunks.forEach((c, i) => { if (i) ans += '\n---\n\n'; ans += `**${c.title}**\n\n${c.answer}`; });
-    if (docs.length) ans += `\n\n---\n📚 ${docs.length} uploaded document(s) available — reconnect API for full Hybrid RAG.`;
-    return ans + `\n\n---\n*Mode: Local Only · Start sandbox: docker compose up -d in ai-ecosystem-sandbox*`;
+    if (docs.length) ans += `\n\n---\n📚 ${docs.length} uploaded document(s) available — reconnect the model for full Hybrid RAG.`;
+    return ans + `\n\n---\n*Offline local-knowledge answer — the AI model isn't reachable right now. Check the model connection and retry for full Hybrid RAG.*`;
   }
 
   private _localKbContext(query: string, sectorKey: string): string {
