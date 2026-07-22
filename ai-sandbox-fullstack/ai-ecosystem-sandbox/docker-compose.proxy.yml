@@ -48,6 +48,10 @@ services:
     build:
       context: .
       dockerfile: apps/nora_bridge/Dockerfile
+      args:
+        # Optional Microsoft Presidio add-on (PII). Default 0 = lean image.
+        # Set INSTALL_PRESIDIO=1 and PRESIDIO_ENABLED=true to activate.
+        INSTALL_PRESIDIO: ${INSTALL_PRESIDIO:-0}
     container_name: sandbox-nora-bridge
     restart: unless-stopped
     # No host port published on purpose. The bridge is an internal BFF reached only
@@ -65,6 +69,8 @@ services:
       LLM_MODEL_OLLAMA: ${DEFAULT_OLLAMA_MODEL:-llama3.2:1b}
       ACCEL_DEVICE: ${ACCEL_DEVICE:-auto}
       GUARDRAILS_ENABLED: ${GUARDRAILS_ENABLED:-true}
+      # Optional Presidio PII add-on (requires INSTALL_PRESIDIO=1 at build time).
+      PRESIDIO_ENABLED: ${PRESIDIO_ENABLED:-false}
       # Cloud key pools (optional). Prefer OPENAI_API_KEYS=k1,k2 — never commit real keys.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_API_KEY_SECONDARY: ${OPENAI_API_KEY_SECONDARY:-}

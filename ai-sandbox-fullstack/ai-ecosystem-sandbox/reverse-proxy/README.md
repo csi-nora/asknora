@@ -30,6 +30,17 @@ By default the reverse proxy publishes on **`0.0.0.0:9090`** so any device on yo
 The Nora bridge (`/sandbox`) is the **guarded inference path**:
 
 - **Output middleware** runs after the LLM and before the client: PII redaction (email / SG NRIC / phone / card), policy-leak blocking, injection-remnant blocking, lightweight toxicity filter. Toggle with `GUARDRAILS_ENABLED=true`.
+- **Optional Presidio add-on** (Microsoft Presidio — richer NLP PII): off by default. Enable with:
+  ```bash
+  # .env
+  PRESIDIO_ENABLED=true
+  INSTALL_PRESIDIO=1
+  # rebuild + restart the bridge
+  docker compose -f docker-compose.yml -f docker-compose.proxy.yml build nora-bridge
+  docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d nora-bridge
+  curl http://localhost:9090/sandbox/guardrails/status   # → presidio.active: true
+  ```
+  Packages: `apps/nora_bridge/requirements-presidio.txt`. Lean regex PII still runs when Presidio is off.
 - **API key rotation** (cloud OpenAI / Anthropic / HF only — **Ollama needs no keys**): put keys in `.env` (never commit). Prefer a pool:
   ```bash
   OPENAI_API_KEYS=sk-primary,sk-secondary
