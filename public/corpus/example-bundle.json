@@ -1,0 +1,9 @@
+{
+  "documents": [
+    {
+      "name": "README-sample.md",
+      "content": "# Sample repo content\n\nReplace this file with CI output from your other repositories. Each JSON bundle under `public/corpus/` can list documents with `name`, `content`, and optional `sensitivity` (`public` | `internal` | `confidential`).\n\nAdd entries to `corpus-manifest.json` to include more bundles in the full corpus index.",
+      "sensitivity": "internal"
+    }
+  ]
+}
