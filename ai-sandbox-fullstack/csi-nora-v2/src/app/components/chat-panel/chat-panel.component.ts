@@ -80,10 +80,12 @@ import { SECTORS }         from '../../data/sectors.data';
           </div>
 
           <!-- Mode tag -->
-          <div *ngIf="m.role==='nora' && m.apiMode">
+          <div *ngIf="m.role==='nora' && m.apiMode" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
             <span class="msg-mode-tag" [ngClass]="m.apiMode==='hybrid' ? 'mm-hybrid' : 'mm-local'">
               {{ m.apiMode==='hybrid' ? '🟢 Hybrid RAG · Dense + Sparse + RRF' : '🟡 Local KB' }}
             </span>
+            <span *ngIf="m.guarded" class="msg-mode-tag mm-guard"
+                  [title]="m.guardReason || 'Output guardrails applied'">🛡️ Guardrails applied</span>
           </div>
 
           <!-- RAG chunks (expandable) -->
@@ -345,14 +347,17 @@ export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.st.isLoading.set(true);
 
     try {
-      const { reply, mode, ragChunks } = await this.api.send(text, this.st.sector()||'sme', this.st.docs);
+      const { reply, mode, ragChunks, guarded, guardReason } = await this.api.send(text, this.st.sector()||'sme', this.st.docs);
       const sources = ragChunks.length ? [...new Set(ragChunks.map(r=>r.chunk.docName))] : [];
-      this._addMsg({ role:'nora', content: reply, docSources: sources, apiMode: mode, ragChunks });
+      this._addMsg({ role:'nora', content: reply, docSources: sources, apiMode: mode, ragChunks, guarded, guardReason });
       // Keep the mode bar in sync with what actually happened for this message.
       this.st.hybridMode.set(mode === 'hybrid' ? 'hybrid' : 'local');
       this.au.log(mode==='hybrid'?'Hybrid RAG Response':'Local Response',
                   `${SECTORS[this.st.sector()||'sme'].name} · ${ragChunks.length} chunks`,
                   this.st.sensitivity());
+      if (guarded) {
+        this.au.log('Guardrails', guardReason || 'Output guardrails applied', 'confidential');
+      }
     } catch (err: any) {
       // A transient LLM/network error must NOT trap the app in Local mode while the
       // stack is healthy: serve an offline answer for THIS message only, and force a

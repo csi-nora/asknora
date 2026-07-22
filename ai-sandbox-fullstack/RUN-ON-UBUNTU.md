@@ -19,6 +19,10 @@ If **neither** is up, `http://localhost:9090/` (and the LAN URL) will fail with 
 
 **Quick recovery:** start Docker Desktop on the host → compose up; **or** power on this Ubuntu VM → `./scripts/start-linux.sh`.
 
+### Responsible AI note
+
+Chat via the reverse proxy uses the Nora bridge (`/sandbox`) so **output guardrails** apply (PII redaction, policy/toxicity blocks). Cloud keys (if any) rotate from `.env` pools — **Ollama needs no keys**. Status: `curl http://localhost:9090/sandbox/guardrails/status`. Details: `ai-ecosystem-sandbox/reverse-proxy/README.md`.
+
 > **Networking assumption:** your VM uses **VMware Bridged** mode, so the VM gets its own
 > IP on your physical LAN (e.g. `192.168.1.40`). That means the VM's app is reachable from
 > any device on the network — including the Windows host — with no port forwarding.

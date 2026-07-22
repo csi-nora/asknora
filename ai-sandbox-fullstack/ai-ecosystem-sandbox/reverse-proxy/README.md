@@ -16,13 +16,34 @@ This proxy only answers when the Docker stack is up. You need **one** platform:
 
 If **neither** is up, `http://localhost:9090/` fails with **`ERR_CONNECTION_REFUSED`** — expected.
 
+## Responsible AI — key rotation & output guardrails
+
+The Nora bridge (`/sandbox`) is the **guarded inference path**:
+
+- **Output middleware** runs after the LLM and before the client: PII redaction (email / SG NRIC / phone / card), policy-leak blocking, injection-remnant blocking, lightweight toxicity filter. Toggle with `GUARDRAILS_ENABLED=true`.
+- **API key rotation** (cloud OpenAI / Anthropic / HF only — **Ollama needs no keys**): put keys in `.env` (never commit). Prefer a pool:
+  ```bash
+  OPENAI_API_KEYS=sk-primary,sk-secondary
+  # or
+  OPENAI_API_KEY=sk-primary
+  OPENAI_API_KEY_SECONDARY=sk-secondary
+  ```
+  On HTTP `401` / `403` / `429` the bridge rotates to the next key. Status never returns full keys — only fingerprints + pool sizes:
+  ```bash
+  curl http://localhost:9090/sandbox/guardrails/status
+  ```
+- The Angular app prefers `/sandbox/v1/chat/completions` so guardrails apply on the primary Hybrid RAG demo. Direct `/ollama` remains available as a fallback. Browser "Remember keys" stays optional/local-only.
+
+Smoke: `python apps/nora_bridge/smoke_rai.py` (add `--live` against a running stack).
+
 ## Routing map
 
 | Path                 | Target (prod)                 | Notes                                    |
 |----------------------|-------------------------------|------------------------------------------|
 | `/`                  | CSI Nora SPA (static)         | Angular client-side routing (SPA fallback) |
 | `/ollama/`           | `ollama:11434`                | OpenAI-compatible LLM API, token streaming |
-| `/sandbox/`          | `nora-bridge:8090`            | FastAPI bridge (guardrails + device scale + **server-side KB** at `/sandbox/kb/*`) |
+| `/sandbox/`          | `nora-bridge:8090`            | FastAPI bridge (Responsible AI guardrails + key rotation + device scale + **server-side KB** at `/sandbox/kb/*`) |
+| `/sandbox/guardrails/status` | `nora-bridge:8090`     | Guardrails enabled + key-pool sizes (never the keys) |
 | `/streamlit/`        | `streamlit:8501`              | Dashboard (baseUrlPath=streamlit)          |
 | `/qdrant/`           | `qdrant:6333`                 | Vector DB (debug/direct access)            |
 | `/chroma/`           | `chroma:8000`                 | Vector DB (debug/direct access)            |

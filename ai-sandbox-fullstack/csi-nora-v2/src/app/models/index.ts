@@ -14,6 +14,9 @@ export interface ChatMessage {
   apiMode?:    HybridMode;
   ragChunks?:  RetrievedChunk[];
   timestamp:   string;
+  /** True when bridge output guardrails redacted or blocked content (Responsible AI). */
+  guarded?:    boolean;
+  guardReason?: string;
 }
 
 export interface KbDocument {

@@ -97,7 +97,7 @@ export class ApiService {
     query:     string,
     sectorKey: string,
     docs:      KbDocument[],
-  ): Promise<{ reply: string; mode: HybridMode; ragChunks: RetrievedChunk[] }> {
+  ): Promise<{ reply: string; mode: HybridMode; ragChunks: RetrievedChunk[]; guarded?: boolean; guardReason?: string }> {
 
     // Re-probe whenever we're not already CONFIRMED online, so a stale/transient
     // 'offline' never traps the session in Local mode while the stack is actually
@@ -131,13 +131,69 @@ export class ApiService {
     }));
     history.push({ role: 'user', content: query });
 
-    let raw: string;
     const prov = this.state.api.provider;
+    // Preferred Responsible AI path: route inference through the Nora bridge so
+    // server-side output guardrails (+ cloud key rotation) always apply. Falls
+    // back to direct provider calls if the bridge is unreachable (e.g. static Pages).
+    try {
+      const viaBridge = await this._bridgeChat(prov, system, history);
+      return {
+        reply: this.guardOutput(viaBridge.text),
+        mode: 'hybrid',
+        ragChunks,
+        guarded: viaBridge.guarded,
+        guardReason: viaBridge.guardReason,
+      };
+    } catch (bridgeErr) {
+      console.warn('[API] bridge path unavailable — falling back to direct provider', bridgeErr);
+    }
+
+    let raw: string;
     if      (prov === 'anthropic') raw = await this._anthropic(system, history);
     else if (prov === 'openai' || prov === 'ollama') raw = await this._openaiCompat(prov, system, history);
     else                           raw = await this._hf(system, history);
 
     return { reply: this.guardOutput(raw), mode: 'hybrid', ragChunks };
+  }
+
+  /** Guarded inference via `/sandbox/v1/chat/completions` (bridge BFF). */
+  private async _bridgeChat(
+    prov: ApiProvider,
+    system: string,
+    messages: { role: string; content: string }[],
+  ): Promise<{ text: string; guarded: boolean; guardReason?: string }> {
+    const base = (environment.sandboxBridgeUrl || '/sandbox').replace(/\/$/, '');
+    const body: any = {
+      model: this.state.api.models[prov],
+      max_tokens: this.state.api.maxTokens[prov],
+      messages: [{ role: 'system', content: system }, ...messages],
+      nora_provider: prov,
+      use_guardrails: true,
+      accel_device: this.state.api.accelDevice || environment.defaultAccelDevice || 'auto',
+    };
+    const clientKey = this.state.api.keys[prov];
+    if (clientKey && prov !== 'ollama') body.nora_api_key = clientKey;
+    if (prov === 'ollama') {
+      body.chat_template_kwargs = { enable_thinking: false };
+      const accel = this.state.api.accelDevice;
+      if (accel === 'cpu') body.options = { num_gpu: 0 };
+      if (accel === 'gpu') body.options = { num_gpu: -1 };
+    }
+    const r = await fetch(`${base}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(180000),
+    });
+    if (!r.ok) throw new Error(`bridge HTTP ${r.status}`);
+    const d = await r.json();
+    const text = (d.choices?.[0]?.message?.content || '').trim() || 'No response.';
+    const nora = d.nora || {};
+    return {
+      text,
+      guarded: !!nora.guarded,
+      guardReason: nora.guard_reason || undefined,
+    };
   }
 
   private _localAnswer(query: string, sectorKey: string, docs: KbDocument[]): string {

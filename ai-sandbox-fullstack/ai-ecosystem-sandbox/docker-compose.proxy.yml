@@ -63,6 +63,17 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       LLM_MODEL_OLLAMA: ${DEFAULT_OLLAMA_MODEL:-llama3.2:1b}
       ACCEL_DEVICE: ${ACCEL_DEVICE:-auto}
+      GUARDRAILS_ENABLED: ${GUARDRAILS_ENABLED:-true}
+      # Cloud key pools (optional). Prefer OPENAI_API_KEYS=k1,k2 — never commit real keys.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_KEY_SECONDARY: ${OPENAI_API_KEY_SECONDARY:-}
+      OPENAI_API_KEYS: ${OPENAI_API_KEYS:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_API_KEY_SECONDARY: ${ANTHROPIC_API_KEY_SECONDARY:-}
+      ANTHROPIC_API_KEYS: ${ANTHROPIC_API_KEYS:-}
+      HF_API_KEY: ${HF_API_KEY:-}
+      HF_API_KEY_SECONDARY: ${HF_API_KEY_SECONDARY:-}
+      HF_API_KEYS: ${HF_API_KEYS:-}
       # Server-side, disk-backed Knowledge Base stores (persist on named volumes).
       QDRANT_URL: http://qdrant:6333
       KB_QDRANT_COLLECTION: ${KB_QDRANT_COLLECTION:-csinora_kb}

@@ -197,6 +197,33 @@ static IP** for the host (the app binds `0.0.0.0` and follows the DHCP IP).
 | Firewall rule | `Get-NetFirewallRule -DisplayName "CSI Nora Demo (TCP 9090)"` |
 | Qdrant | `curl http://127.0.0.1:6333/readyz` |
 | Server KB | `curl http://localhost:9090/sandbox/kb/health` → `docCount`/`chunkCount`/`vectorCount` |
+| Guardrails / key pools | `curl http://localhost:9090/sandbox/guardrails/status` → `enabled` + `pool_size` (no secrets) |
+
+## 7C. Responsible AI — key rotation & output guardrails
+
+The primary Hybrid RAG chat path goes through the **Nora bridge** (`/sandbox/v1/chat/completions`) so **output guardrails** always run after the LLM:
+
+- PII redaction (email, SG NRIC, phone, card-like digits)
+- Policy / confidentiality leak blocking
+- Prompt-injection remnant blocking
+- Lightweight toxicity / unsafe-content filter
+
+Toggle: `GUARDRAILS_ENABLED=true` in `ai-ecosystem-sandbox/.env`.
+
+**Cloud API key rotation** (OpenAI / Anthropic / HF — **Ollama needs no keys**): store keys only in `.env` (never commit). Prefer a rotating pool:
+
+```bash
+OPENAI_API_KEYS=sk-primary,sk-secondary
+# or OPENAI_API_KEY=… + OPENAI_API_KEY_SECONDARY=…
+```
+
+On HTTP `401` / `403` / `429` the bridge rotates to the next key. Fingerprints only:
+
+```bash
+curl http://localhost:9090/sandbox/guardrails/status
+```
+
+Browser "Remember keys" remains optional/local-only. Smoke: `python apps/nora_bridge/smoke_rai.py [--live]`.
 
 ## 7B. Knowledge Base — server-side, disk-backed (default)
 
