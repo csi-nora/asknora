@@ -11,7 +11,8 @@
 #                     http://localhost/sandbox/    (bridge)
 #                     http://localhost/streamlit/  (dashboard)
 #
-# Change the published port with PROXY_HTTP_PORT (e.g. PROXY_HTTP_PORT=9090).
+# By default the proxy binds 0.0.0.0:9090 (LAN-reachable). Override with
+# PROXY_BIND_HOST / PROXY_HTTP_PORT in .env if needed.
 
 services:
   reverse-proxy:
@@ -19,9 +20,9 @@ services:
     container_name: sandbox-proxy
     restart: unless-stopped
     ports:
-      # Bind 0.0.0.0 so the demo is reachable from other LAN hosts (http://<LAN-IP>:PORT).
-      # This is the ONLY service intentionally exposed to the LAN. See reverse-proxy/README.md.
-      - "0.0.0.0:${PROXY_HTTP_PORT:-80}:80"
+      # DEFAULT: expose on all interfaces (LAN). Only the proxy is published this way;
+      # backends stay on 127.0.0.1. See reverse-proxy/README.md.
+      - "${PROXY_BIND_HOST:-0.0.0.0}:${PROXY_HTTP_PORT:-9090}:80"
     volumes:
       - ./reverse-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
       # Built Angular SPA (run `npm run build` in ../csi-nora-v2 first)

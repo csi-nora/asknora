@@ -46,9 +46,10 @@ Log "Docker engine is ready."
 Push-Location $sandboxDir
 try {
   $env:PROXY_HTTP_PORT = $Port
-  Log "docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d ..."
-  & docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d 2>&1 | Tee-Object -FilePath $log -Append
+  if (-not $env:PROXY_BIND_HOST) { $env:PROXY_BIND_HOST = '0.0.0.0' }
+  Log "docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d (bind $($env:PROXY_BIND_HOST):$Port)..."
+  & docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --remove-orphans 2>&1 | Tee-Object -FilePath $log -Append
   Log "compose up exit code = $LASTEXITCODE"
 } finally { Pop-Location }
 
-Log "=== autostart-stack done. UI: http://localhost:$Port/  (LAN: http://<LAN-IP>:$Port/) ==="
+Log "=== autostart-stack done. UI: http://localhost:$Port/  (LAN default: 0.0.0.0:$Port) ==="

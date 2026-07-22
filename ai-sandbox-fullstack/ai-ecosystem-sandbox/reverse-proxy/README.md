@@ -16,6 +16,15 @@ This proxy only answers when the Docker stack is up. You need **one** platform:
 
 If **neither** is up, `http://localhost:9090/` fails with **`ERR_CONNECTION_REFUSED`** — expected.
 
+## Default LAN bind (`0.0.0.0:9090`)
+
+By default the reverse proxy publishes on **`0.0.0.0:9090`** so any device on your LAN can open `http://<host-LAN-IP>:9090/`. Only the proxy is LAN-exposed; Ollama, the bridge, and databases stay on `127.0.0.1`.
+
+| Env var | Default | Meaning |
+|---------|---------|---------|
+| `PROXY_BIND_HOST` | `0.0.0.0` | Listen on all interfaces (LAN). Set `127.0.0.1` for localhost-only. |
+| `PROXY_HTTP_PORT` | `9090` | Host port (avoids Windows reserved 80/8080). |
+
 ## Responsible AI — key rotation & output guardrails
 
 The Nora bridge (`/sandbox`) is the **guarded inference path**:
