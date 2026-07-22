@@ -2,6 +2,19 @@
 
 Version: **1.0.0** · Ready for any Windows / Linux / macOS host with Docker + Node 18+ + Python 3.11+
 
+## ⚠️ Basic requirements (runtime)
+
+To serve CSI Nora at **`:9090`** you need **one** of these platforms running:
+
+| Option | What must be running | Then start the stack with |
+|--------|----------------------|---------------------------|
+| **(A) Host Docker** | Docker Desktop / Engine on this machine | `RUN-ASKNORA.bat` (Windows) or `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` from `ai-ecosystem-sandbox` |
+| **(B) Ubuntu VM** | VMware Ubuntu guest powered on (**Bridged**) | `./scripts/start-linux.sh` (see [RUN-ON-UBUNTU.md](RUN-ON-UBUNTU.md)) |
+
+If **neither** is up, `http://localhost:9090/` (and the LAN URL) will fail with **`ERR_CONNECTION_REFUSED`** — that is expected.
+
+**Quick recovery:** start Docker Desktop → `RUN-ASKNORA.bat` / compose up; **or** power on the Ubuntu VM → `./scripts/start-linux.sh`.
+
 ## What's included
 
 ```

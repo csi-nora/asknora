@@ -5,6 +5,17 @@ port. The CSI Nora UI is served at `/`, and every backend service is reached
 through a path prefix — so the browser only ever talks to **one origin**, which
 also removes all CORS problems.
 
+## ⚠️ Basic requirements (runtime)
+
+This proxy only answers when the Docker stack is up. You need **one** platform:
+
+| Option | What must be running | Then start with |
+|--------|----------------------|-----------------|
+| **(A) Host Docker** | Docker Desktop / Engine | `scripts/start_proxy.ps1 -Port 9090` or compose up below |
+| **(B) Ubuntu VM** | VMware guest powered on (**Bridged**) | `./scripts/start-linux.sh` — see `RUN-ON-UBUNTU.md` |
+
+If **neither** is up, `http://localhost:9090/` fails with **`ERR_CONNECTION_REFUSED`** — expected.
+
 ## Routing map
 
 | Path                 | Target (prod)                 | Notes                                    |

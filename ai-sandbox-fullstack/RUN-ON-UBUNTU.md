@@ -6,6 +6,19 @@ fully self-contained in Docker Compose — the Angular UI, nginx reverse proxy, 
 there is **no dependency on the Windows host**. You can run this VM instance alongside the
 Windows instance; both are independent.
 
+## ⚠️ Basic requirements (runtime)
+
+To serve CSI Nora at **`:9090`** you need **one** of these platforms running:
+
+| Option | What must be running | Then start the stack with |
+|--------|----------------------|---------------------------|
+| **(A) Host Docker** | Docker Desktop / Engine on the Windows (or Linux) host | `RUN-ASKNORA.bat` / `scripts/start_proxy.ps1 -Port 9090` |
+| **(B) This Ubuntu VM** | VMware guest **powered on** (**Bridged**) | `./scripts/start-linux.sh` (this runbook) |
+
+If **neither** is up, `http://localhost:9090/` (and the LAN URL) will fail with **`ERR_CONNECTION_REFUSED`** — that is expected.
+
+**Quick recovery:** start Docker Desktop on the host → compose up; **or** power on this Ubuntu VM → `./scripts/start-linux.sh`.
+
 > **Networking assumption:** your VM uses **VMware Bridged** mode, so the VM gets its own
 > IP on your physical LAN (e.g. `192.168.1.40`). That means the VM's app is reachable from
 > any device on the network — including the Windows host — with no port forwarding.

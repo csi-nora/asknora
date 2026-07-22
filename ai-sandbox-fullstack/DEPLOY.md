@@ -1,5 +1,18 @@
 # Deploy checklist — CSI Nora Full Stack
 
+## ⚠️ Basic requirements (runtime)
+
+To serve CSI Nora at **`:9090`** you need **one** of these platforms running:
+
+| Option | What must be running | Then start the stack with |
+|--------|----------------------|---------------------------|
+| **(A) Host Docker** | Docker Desktop / Engine on this machine | `RUN-ASKNORA.bat` or §2 / §7 compose up below |
+| **(B) Ubuntu VM** | VMware Ubuntu guest powered on (**Bridged**) | `./scripts/start-linux.sh` — see [RUN-ON-UBUNTU.md](RUN-ON-UBUNTU.md) |
+
+If **neither** is up, `http://localhost:9090/` (and the LAN URL) will fail with **`ERR_CONNECTION_REFUSED`** — that is expected.
+
+**Quick recovery:** start Docker Desktop → `RUN-ASKNORA.bat` / compose up; **or** power on the Ubuntu VM → `./scripts/start-linux.sh`.
+
 ## 1. Unpack
 
 ```bash

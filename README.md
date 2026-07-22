@@ -13,6 +13,21 @@
 
 ---
 
+## ⚠️ Basic requirements (runtime)
+
+To serve CSI Nora at **`:9090`** you need **one** of these platforms running:
+
+| Option | What must be running | Then start the stack with |
+|--------|----------------------|---------------------------|
+| **(A) Host Docker** | Docker Desktop / Engine on the machine | `ai-sandbox-fullstack/RUN-ASKNORA.bat` (Windows) or `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` |
+| **(B) Ubuntu VM** | VMware Ubuntu guest powered on (**Bridged**) | `./scripts/start-linux.sh` inside `ai-sandbox-fullstack/ai-ecosystem-sandbox` |
+
+If **neither** is up, `http://localhost:9090/` (and the LAN URL) will fail with **`ERR_CONNECTION_REFUSED`** — that is expected.
+
+**Quick recovery:** start Docker Desktop → run `RUN-ASKNORA.bat` / compose up; **or** power on the Ubuntu VM → `./scripts/start-linux.sh`.
+
+---
+
 ## 🐧 Run the full stack on Ubuntu (VMware Bridged) — one command
 
 Run the **entire self-contained stack** (Angular UI + nginx proxy + Ollama + FastAPI bridge + vector DBs) on an Ubuntu VM. With **VMware Bridged** networking the VM gets its own LAN IP, so the app is reachable from any device on the network — independently of a Windows instance.
