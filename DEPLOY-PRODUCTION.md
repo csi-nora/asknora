@@ -14,6 +14,21 @@ Single entry point for **AI Enterprise Challenge** / enterprise production runs.
 
 ---
 
+## Local Ubuntu laptop demo (no cloud)
+
+For **demonstrations on your own machine** — no AWS, no tunnel:
+
+```bash
+npm install
+npm run demo
+```
+
+Open **http://localhost:8080** in Firefox on the **same laptop**.
+
+Full guide: [deploy/ubuntu-laptop/README.md](./deploy/ubuntu-laptop/README.md)
+
+---
+
 ## Fastest path — Docker (recommended)
 
 ```bash
