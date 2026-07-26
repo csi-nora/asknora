@@ -1,12 +1,10 @@
-import { Component, computed } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule, TitleCasePipe } from '@angular/common';
 import { StateService }  from '../../services/state.service';
 import { StorageService } from '../../services/storage.service';
-import { ExternalStorageService } from '../../services/external-storage.service';
 import { AuditService }   from '../../services/audit.service';
 import { ApiService, PROV_COLOR, PROV_LABEL } from '../../services/api.service';
 import { RagService }     from '../../services/rag.service';
-import { CorpusAggregatorService } from '../../services/corpus-aggregator.service';
 import { EmbeddingService } from '../../services/embedding.service';
 import { SECTORS }        from '../../data/sectors.data';
 
@@ -20,16 +18,53 @@ import { SECTORS }        from '../../data/sectors.data';
   <!-- Security -->
   <div class="info-section">
     <div class="info-title">🔐 Security Status</div>
-    <div class="sec-item"><span class="sec-label">IAM Auth</span>
-      <div class="sec-status"><div class="status-dot" style="background:var(--green);box-shadow:0 0 6px rgba(34,197,94,.5)"></div><span style="color:var(--green)">Active</span></div></div>
-    <div class="sec-item"><span class="sec-label">Role Filter</span>
-      <div class="sec-status"><div class="status-dot" style="background:var(--green)"></div><span style="color:var(--green)">{{ st.role() }}</span></div></div>
+    <div class="sec-item"><span class="sec-label">IAM / Role ACL</span>
+      <div class="sec-status"><div class="status-dot" style="background:var(--green)"></div>
+        <span style="color:var(--green)">{{ st.role() }} · {{ clearanceLabel() }}</span></div></div>
     <div class="sec-item"><span class="sec-label">Output Guard</span>
-      <div class="sec-status"><div class="status-dot" style="background:var(--green)"></div><span style="color:var(--green)">Active</span></div></div>
+      <div class="sec-status"><div class="status-dot" [style.background]="guardDot()"></div>
+        <span [style.color]="guardColor()">{{ guardLabel() }}</span></div></div>
+    <div class="sec-item"><span class="sec-label">Presidio</span>
+      <div class="sec-status"><div class="status-dot" [style.background]="presidioDot()"></div>
+        <span>{{ presidioLabel() }}</span></div></div>
     <div class="sec-item"><span class="sec-label">Provider</span>
       <div class="sec-status"><div class="status-dot" [style.background]="provColor()"></div><span>{{ provLabel() }}</span></div></div>
     <div class="sec-item"><span class="sec-label">Mode</span>
-      <div class="sec-status"><div class="status-dot" [style.background]="modeDot()"></div><span [style.color]="modeColor()">{{ st.hybridMode() | titlecase }}</span></div></div>
+      <div class="sec-status"><div class="status-dot" [style.background]="modeDot()"></div>
+        <span [style.color]="modeColor()">{{ st.hybridMode() | titlecase }}</span></div></div>
+  </div>
+
+  <!-- Agentic AI 12-layer STRIDE -->
+  <div class="info-section">
+    <div class="info-title">🛡️ STRIDE · 12-Layer
+      <button class="btn-sm" (click)="refreshThreat()">Refresh</button>
+    </div>
+    <div *ngIf="!tm()" style="font-size:10px;color:var(--amber);padding:4px 0">
+      Bridge offline — threat-model status unavailable (degraded RAI path).
+    </div>
+    <ng-container *ngIf="tm() as t">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">
+        {{ t.framework || 'Agentic AI Threat Model' }}
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
+        <span style="color:var(--muted)">Control coverage</span>
+        <span style="color:var(--green);font-weight:600">{{ t.coverage?.pct ?? 0 }}%</span>
+      </div>
+      <div class="storage-bar-wrap" style="margin-bottom:8px">
+        <div class="storage-bar s-ok" [style.width.%]="t.coverage?.pct || 0"></div>
+      </div>
+      <div class="stride-grid">
+        <div class="stride-chip" *ngFor="let s of t.stride_layers || []"
+             [class.ok]="s.covered" [class.warn]="!s.covered"
+             [title]="s.name">
+          <span class="sid">{{ s.id }}</span>
+          <span class="sname">L{{ s.layer }}</span>
+        </div>
+      </div>
+      <div style="font-size:9px;color:var(--dim);margin-top:6px;line-height:1.4">
+        L1–L6 STRIDE · L7–L12 process (scope→monitor). Trust: User↔Agent↔Tools↔Memory↔External.
+      </div>
+    </ng-container>
   </div>
 
   <!-- RAG Stats -->
@@ -37,16 +72,6 @@ import { SECTORS }        from '../../data/sectors.data';
     <div class="info-title">
       🧠 RAG Pipeline
       <button class="btn-sm" (click)="st.activeModal.set('rag-config')">Configure</button>
-      <button
-        class="btn-sm"
-        type="button"
-        (click)="indexFullCorpus()"
-        [disabled]="corpus.status()==='loading'"
-        title="Index uploads + local KB + public-kb.json + corpus manifest bundles"
-      >{{ corpus.status()==='loading' ? 'Indexing…' : 'Index all sources' }}</button>
-    </div>
-    <div *ngIf="corpus.lastBreakdown() as b" style="font-size:9px;color:var(--muted);margin:-4px 0 6px;line-height:1.35">
-      Last index: uploads {{ b.uploads }} · local KB {{ b.localKb }} · public web {{ b.publicWeb }} · bundles {{ b.bundles }}
     </div>
 
     <div class="rag-stats-grid">
@@ -123,20 +148,8 @@ import { SECTORS }        from '../../data/sectors.data';
       <div class="storage-bar" [ngClass]="barCls()" [style.width.%]="ss.stats$.value.pct"></div>
     </div>
     <div style="font-size:9px;color:var(--dim);text-align:right;margin-top:2px">
-      Vec: {{ ss.fmt(ss.stats$.value.vecSize) }} · Docs: {{ ss.fmt(ss.stats$.value.docSize) }} · Chat ref: {{ ss.fmt(ss.stats$.value.chatRefSize) }}
+      Vec: {{ ss.fmt(ss.stats$.value.vecSize) }} · Docs: {{ ss.fmt(ss.stats$.value.docSize) }}
     </div>
-    <div style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.35">
-      Tier: {{ tierLabel() }}
-      <span *ngIf="ext.status$.value.externalConnected"> · {{ ext.status$.value.externalFolderName }}</span>
-    </div>
-    <button
-      class="btn-sm"
-      type="button"
-      style="margin-top:6px;width:100%"
-      (click)="connectExternal()"
-      [disabled]="extConnecting"
-      *ngIf="!ext.status$.value.externalConnected"
-    >{{ extConnecting ? 'Opening folder picker…' : 'Connect USB/DASD folder' }}</button>
     <div class="stor-clear-row" style="margin-top:6px">
       <button class="stor-clear-btn" (click)="clear('messages')">Msgs</button>
       <button class="stor-clear-btn" (click)="clear('docs')">Docs</button>
@@ -150,25 +163,52 @@ import { SECTORS }        from '../../data/sectors.data';
   `,
   styles: [`:host{display:contents}
     .ip{border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;
-      &::-webkit-scrollbar{width:3px}&::-webkit-scrollbar-thumb{background:var(--border)}}`]
+      &::-webkit-scrollbar{width:3px}&::-webkit-scrollbar-thumb{background:var(--border)}}
+    .stride-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+    .stride-chip{border:1px solid var(--border);border-radius:6px;padding:4px 6px;display:flex;justify-content:space-between;align-items:center;font-size:10px}
+    .stride-chip.ok{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.08)}
+    .stride-chip.warn{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.08)}
+    .stride-chip .sid{font-weight:700;color:var(--text)}
+    .stride-chip .sname{color:var(--dim)}`]
 })
 export class InfoPanelComponent {
-  extConnecting = false;
-
   constructor(
     public st: StateService,
     public ss: StorageService,
-    public ext: ExternalStorageService,
     public au: AuditService,
     private apiSvc: ApiService,
     public rag: RagService,
     public embedSvc: EmbeddingService,
-    public corpus: CorpusAggregatorService,
-  ) {}
-
-  indexFullCorpus(): void {
-    void this.corpus.reindexFullCorpus().catch(() => {});
+  ) {
+    this.apiSvc.refreshThreatModel();
+    setInterval(() => this.apiSvc.refreshThreatModel(), 60_000);
   }
+
+  tm = () => this.apiSvc.threatModel();
+
+  clearanceLabel() {
+    const acl = this.st.ROLE_ACL[this.st.role()] || [];
+    return acl.join('+');
+  }
+  guardLabel() {
+    const g = this.tm()?.guardrails;
+    if (!this.tm()) return this.st.hybridMode() === 'hybrid' ? 'Bridge path' : 'Degraded';
+    return g?.enabled ? 'Active' : 'Off';
+  }
+  guardDot() {
+    if (!this.tm()) return 'var(--amber)';
+    return this.tm()?.guardrails?.enabled ? 'var(--green)' : 'var(--amber)';
+  }
+  guardColor() { return this.guardDot(); }
+  presidioLabel() {
+    const p = this.tm()?.guardrails?.presidio;
+    if (!this.tm()) return '—';
+    return p?.active ? 'On' : 'Off';
+  }
+  presidioDot() {
+    return this.tm()?.guardrails?.presidio?.active ? 'var(--green)' : 'var(--dim)';
+  }
+  refreshThreat() { this.apiSvc.refreshThreatModel(); this.au.log('Threat Model', 'Refreshed 12-layer STRIDE status', this.st.sensitivity()); }
 
   sectorLabel() {
     const s = this.st.sector();
@@ -180,22 +220,6 @@ export class InfoPanelComponent {
   modeDot()     { return this.st.hybridMode()==='hybrid'?'var(--green)':this.st.hybridMode()==='local'?'var(--amber)':'var(--blue)'; }
   modeColor()   { return this.modeDot(); }
   barCls()      { const p=this.ss.stats$.value.pct; return p<70?'s-ok':p<90?'s-warn':'s-full'; }
-
-  tierLabel(): string {
-    const s = this.ext.status$.value;
-    if (s.externalConnected) return 'External USB/DASD';
-    if (s.opfsAvailable) return 'OPFS (extended)';
-    return 'Browser local';
-  }
-
-  async connectExternal(): Promise<void> {
-    this.extConnecting = true;
-    try {
-      await this.ext.connectExternalFolder(this.ss);
-    } finally {
-      this.extConnecting = false;
-    }
-  }
 
   clear(t: any) {
     if (!confirm(`Clear ${t} from local storage?`)) return;

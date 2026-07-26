@@ -1,36 +1,10 @@
-export type ApiProvider   = 'anthropic' | 'openai' | 'hf';
-export type ApiHealthStatus = 'online' | 'offline' | 'unknown';
+export type ApiProvider   = 'anthropic' | 'openai' | 'hf' | 'ollama';
 export type Sensitivity   = 'public' | 'internal' | 'confidential';
 export type UserRole      = 'engineer' | 'support' | 'sales' | 'manager' | 'executive';
 export type HybridMode    = 'hybrid' | 'local' | 'checking';
 export type RagMode       = 'hybrid' | 'dense' | 'sparse' | 'off';
 export type EmbedStatus   = 'idle' | 'loading' | 'ready' | 'error';
-
-/** Runtime deployment lane (sandbox vs production builds). */
-export type DeploymentTier = 'sandbox' | 'production';
-
-/** Which product experience the user chose from the launcher (persisted). */
-export type ProductExperience = 'governance' | 'ask-nora' | 'both' | 'aichatops';
-
-/** Angular `environment` object shape (build-time file replacement). */
-export interface AppEnvironment {
-  production: boolean;
-  deploymentTier: DeploymentTier;
-  /** Browser tier override for UAT — always `false` in production builds. */
-  allowUatOverride: boolean;
-  appVersion: string;
-  /**
-   * CSI Nora API gateway origin (no trailing slash).
-   * Empty string: browser calls model providers directly (keys from API settings UI).
-   * Non-empty: requests go to `{backendBaseUrl}/api/llm/...` (see `backend-llm-urls.ts`).
-   */
-  backendBaseUrl: string;
-  /**
-   * Prefer the token/gateway backend over direct provider calls in the browser.
-   * Production builds should set `true` when using the CSI Nora API gateway; optional YAML can override.
-   */
-  preferTokenBackend: boolean;
-}
+export type AccelDevice   = 'auto' | 'cpu' | 'gpu' | 'npu';
 
 export interface ChatMessage {
   id:          string;
@@ -40,16 +14,17 @@ export interface ChatMessage {
   apiMode?:    HybridMode;
   ragChunks?:  RetrievedChunk[];
   timestamp:   string;
-}
-
-/** Saved Q&A pairs for reference (separate from live session transcript). */
-export interface ChatHistoryEntry {
-  id: string;
-  at: string;
-  query: string;
-  source: string;
-  content: string;
-  linkedFiles: string[];
+  /** True when bridge output guardrails redacted or blocked content (Responsible AI). */
+  guarded?:    boolean;
+  guardReason?: string;
+  /** Prompt / input tokens for this turn (from API usage or estimate). */
+  inputTokens?:  number;
+  /** Completion / output tokens for this turn. */
+  outputTokens?: number;
+  /** Total tokens when available. */
+  totalTokens?:  number;
+  /** Whether counts came from provider usage or a local estimate. */
+  tokenSource?:  'api' | 'estimate';
 }
 
 export interface KbDocument {
@@ -62,29 +37,10 @@ export interface KbDocument {
   uploadedAt:  string;
   chunkCount:  number;
   indexed:     boolean;
-}
-
-/** Optional multi-repo / batch corpus shipped under `public/corpus/` (see `corpus-manifest.json`). */
-export interface CorpusManifest {
-  version?: number;
-  bundles: CorpusManifestBundle[];
-}
-
-export interface CorpusManifestBundle {
-  id: string;
-  /** Path under site root, e.g. `/corpus/team-handbook.json` */
-  url: string;
-  name?: string;
-}
-
-export interface CorpusBundleFile {
-  documents: CorpusBundleDocument[];
-}
-
-export interface CorpusBundleDocument {
-  name: string;
-  content: string;
-  sensitivity?: Sensitivity;
+  /** Business sector key (healthcare, financial, …). Stamped at ingest. */
+  sector?:     string | null;
+  /** Alternate metadata key some exports use; resolved the same as `sector`. */
+  businessSector?: string | null;
 }
 
 export interface TextChunk {
@@ -93,6 +49,8 @@ export interface TextChunk {
   docName:     string;
   content:     string;
   sensitivity: Sensitivity;
+  /** Inherited from parent doc at chunk time (optional for older indexes). */
+  sector?:     string | null;
 }
 
 export interface RetrievedChunk {
@@ -134,6 +92,10 @@ export interface ApiConfig {
   models:    Record<ApiProvider, string>;
   keys:      Record<ApiProvider, string>;
   maxTokens: Record<ApiProvider, number>;
+  /** OpenAI-compatible base URL (used by openai + ollama) */
+  baseUrls:  Partial<Record<ApiProvider, string>>;
+  /** Compute preference when talking to local sandbox */
+  accelDevice: AccelDevice;
 }
 
 export interface NamedSession {
@@ -149,7 +111,7 @@ export interface NamedSession {
 
 export interface SectorSvc  { tag: string; color: string; bg: string; }
 export interface Sector {
-  name: string; icon: string; desc: string; count: number;
+  name: string; icon: string; desc: string;
   services: SectorSvc[]; quickPrompts: string[]; context: string;
 }
 
@@ -158,18 +120,5 @@ export interface KbChunk { id: string; tags: string[]; title: string; answer: st
 export interface StorageStats {
   total: number; msgSize: number; docSize: number;
   auditSize: number; nsSize: number; vecSize: number;
-  chatRefSize: number;
   pct: number; lastSaved: string | null;
-}
-
-/** Active storage tier after hydration (localStorage → IndexedDB → OPFS → external folder). */
-export type ExternalStorageTier = 'local' | 'idb' | 'opfs' | 'external';
-
-export interface ExternalStorageStatus {
-  tier: ExternalStorageTier;
-  opfsAvailable: boolean;
-  externalConnected: boolean;
-  externalFolderName: string | null;
-  /** One-time banner when File System Access API is supported but no folder linked yet. */
-  showConnectPrompt: boolean;
 }

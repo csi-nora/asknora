@@ -71,10 +71,13 @@ def _ensure_schema() -> None:
                 content     TEXT DEFAULT '',
                 chunk_count INT  DEFAULT 0,
                 indexed     BOOLEAN DEFAULT FALSE,
-                uploaded_at TIMESTAMPTZ DEFAULT NOW()
+                uploaded_at TIMESTAMPTZ DEFAULT NOW(),
+                sector      TEXT
             );
             """
         )
+        # Migrate volumes created before `sector` existed.
+        cur.execute("ALTER TABLE kb.documents ADD COLUMN IF NOT EXISTS sector TEXT;")
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS kb.chunks (
@@ -83,10 +86,12 @@ def _ensure_schema() -> None:
                 doc_name    TEXT,
                 content     TEXT NOT NULL,
                 sensitivity TEXT DEFAULT 'internal',
+                sector      TEXT,
                 tsv         TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
             );
             """
         )
+        cur.execute("ALTER TABLE kb.chunks ADD COLUMN IF NOT EXISTS sector TEXT;")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_kb_chunks_tsv ON kb.chunks USING GIN (tsv);")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_kb_chunks_doc ON kb.chunks (doc_id);")
         conn.commit()
@@ -131,6 +136,7 @@ class ChunkIn(BaseModel):
     docName: str
     content: str
     sensitivity: str = "internal"
+    sector: Optional[str] = None
     vector: Optional[list[float]] = None
 
 
@@ -142,6 +148,7 @@ class DocIn(BaseModel):
     sensitivity: str = "internal"
     content: str = ""
     uploadedAt: Optional[str] = None
+    sector: Optional[str] = None
     chunks: list[ChunkIn] = Field(default_factory=list)
 
 
@@ -154,6 +161,7 @@ class DocOut(BaseModel):
     chunkCount: int
     indexed: bool
     uploadedAt: Optional[str] = None
+    sector: Optional[str] = None
 
 
 class QueryIn(BaseModel):
@@ -175,6 +183,7 @@ class RetrievedOut(BaseModel):
     sparseScore: float
     hybridScore: float
     rank: int
+    sector: Optional[str] = None
 
 
 # ── Qdrant helpers (REST via httpx — no client lib, keeps the image lean) ─────────
@@ -198,7 +207,9 @@ def _qdrant_search(vector: list[float], sensitivities: Optional[list[str]], limi
         out.append({
             "chunkId": pl.get("chunkId"), "docId": pl.get("docId"),
             "docName": pl.get("docName"), "content": pl.get("content", ""),
-            "sensitivity": pl.get("sensitivity", "internal"), "score": float(p.get("score", 0.0)),
+            "sensitivity": pl.get("sensitivity", "internal"),
+            "sector": pl.get("sector"),
+            "score": float(p.get("score", 0.0)),
         })
     return [x for x in out if x["chunkId"]]
 
@@ -227,7 +238,7 @@ def _pg_search(query: str, sensitivities: Optional[list[str]], limit: int) -> li
         params.append(sensitivities)
     params.append(limit)
     sql = (
-        "SELECT chunk_id, doc_id, doc_name, content, sensitivity, "
+        "SELECT chunk_id, doc_id, doc_name, content, sensitivity, sector, "
         "ts_rank(tsv, to_tsquery('english', %s)) AS score "
         f"FROM kb.chunks {clause} ORDER BY score DESC LIMIT %s"
     )
@@ -236,7 +247,7 @@ def _pg_search(query: str, sensitivities: Optional[list[str]], limit: int) -> li
         rows = cur.fetchall()
     out = [{
         "chunkId": r[0], "docId": r[1], "docName": r[2], "content": r[3],
-        "sensitivity": r[4], "score": float(r[5] or 0.0),
+        "sensitivity": r[4], "sector": r[5], "score": float(r[6] or 0.0),
     } for r in rows]
     # Normalise to [0,1] (max=1) to mirror the client's BM25 normalisation.
     mx = max((x["score"] for x in out), default=0.0) or 1.0
@@ -298,7 +309,7 @@ def list_documents() -> list[DocOut]:
         ensure_ready()
         with psycopg.connect(PG_DSN, connect_timeout=5) as conn, conn.cursor() as cur:
             cur.execute(
-                "SELECT doc_id,name,type,size,sensitivity,chunk_count,indexed,uploaded_at "
+                "SELECT doc_id,name,type,size,sensitivity,chunk_count,indexed,uploaded_at,sector "
                 "FROM kb.documents ORDER BY uploaded_at DESC"
             )
             rows = cur.fetchall()
@@ -308,6 +319,7 @@ def list_documents() -> list[DocOut]:
         id=r[0], name=r[1], type=r[2] or "", size=int(r[3] or 0), sensitivity=r[4] or "internal",
         chunkCount=int(r[5] or 0), indexed=bool(r[6]),
         uploadedAt=r[7].isoformat() if r[7] else None,
+        sector=r[8] if len(r) > 8 else None,
     ) for r in rows]
 
 
@@ -323,21 +335,23 @@ def ingest_document(doc: DocIn) -> DocOut:
         with psycopg.connect(PG_DSN, connect_timeout=10) as conn, conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO kb.documents(doc_id,name,type,size,sensitivity,content,chunk_count,indexed,uploaded_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,COALESCE(%s::timestamptz, NOW()))
+                INSERT INTO kb.documents(doc_id,name,type,size,sensitivity,content,chunk_count,indexed,uploaded_at,sector)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,COALESCE(%s::timestamptz, NOW()),%s)
                 ON CONFLICT (doc_id) DO UPDATE SET
                     name=EXCLUDED.name, type=EXCLUDED.type, size=EXCLUDED.size,
                     sensitivity=EXCLUDED.sensitivity, content=EXCLUDED.content,
-                    chunk_count=EXCLUDED.chunk_count, indexed=EXCLUDED.indexed
+                    chunk_count=EXCLUDED.chunk_count, indexed=EXCLUDED.indexed,
+                    sector=EXCLUDED.sector
                 """,
                 (doc.id, doc.name, doc.type, doc.size, doc.sensitivity, doc.content,
-                 len(doc.chunks), False, doc.uploadedAt),
+                 len(doc.chunks), False, doc.uploadedAt, doc.sector),
             )
             cur.execute("DELETE FROM kb.chunks WHERE doc_id=%s", (doc.id,))
             if doc.chunks:
                 cur.executemany(
-                    "INSERT INTO kb.chunks(chunk_id,doc_id,doc_name,content,sensitivity) VALUES (%s,%s,%s,%s,%s)",
-                    [(c.id, c.docId, c.docName, c.content, c.sensitivity) for c in doc.chunks],
+                    "INSERT INTO kb.chunks(chunk_id,doc_id,doc_name,content,sensitivity,sector) VALUES (%s,%s,%s,%s,%s,%s)",
+                    [(c.id, c.docId, c.docName, c.content, c.sensitivity, c.sector or doc.sector)
+                     for c in doc.chunks],
                 )
             conn.commit()
     except Exception as exc:  # noqa: BLE001
@@ -350,6 +364,7 @@ def ingest_document(doc: DocIn) -> DocOut:
         "payload": {
             "chunkId": c.id, "docId": c.docId, "docName": c.docName,
             "content": c.content, "sensitivity": c.sensitivity,
+            "sector": c.sector or doc.sector,
         },
     } for c in doc.chunks if c.vector]
 
@@ -371,6 +386,7 @@ def ingest_document(doc: DocIn) -> DocOut:
     return DocOut(
         id=doc.id, name=doc.name, type=doc.type, size=doc.size, sensitivity=doc.sensitivity,
         chunkCount=len(doc.chunks), indexed=indexed, uploadedAt=doc.uploadedAt,
+        sector=doc.sector,
     )
 
 
@@ -426,5 +442,6 @@ def query_kb(q: QueryIn) -> list[RetrievedOut]:
             content=p.get("content", ""), sensitivity=p.get("sensitivity", "internal"),
             denseScore=round(v["d"], 6), sparseScore=round(v["s"], 6),
             hybridScore=round(v["h"], 6), rank=rank,
+            sector=p.get("sector"),
         ))
     return results

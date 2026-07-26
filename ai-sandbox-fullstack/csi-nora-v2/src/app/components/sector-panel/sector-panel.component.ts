@@ -7,7 +7,7 @@ import { RagService }       from '../../services/rag.service';
 import { EmbeddingService } from '../../services/embedding.service';
 import { KbStorageService } from '../../services/kb-storage.service';
 import { KbBackendService } from '../../services/kb-backend.service';
-import { SECTORS, SECTOR_KEYS } from '../../data/sectors.data';
+import { SECTORS, SECTOR_KEYS, chunkCountsBySector } from '../../data/sectors.data';
 import { Sensitivity } from '../../models';
 
 @Component({
@@ -20,7 +20,7 @@ import { Sensitivity } from '../../models';
   <button *ngFor="let k of keys" class="sector-btn" [class.active]="st.sector()===k" (click)="pick(k)">
     <span class="si">{{ S[k].icon }}</span>
     <span class="sn">{{ S[k].name }}</span>
-    <span class="sc">{{ S[k].count }}</span>
+    <span class="sc">{{ chunkCount(k) }}</span>
   </button>
 
   <div class="divider"></div>
@@ -190,6 +190,18 @@ export class SectorPanelComponent {
   /** Chunk/vector counts from the active backing (rag getters are server-aware). */
   get kbChunks()  { return this.rag.totalChunks; }
   get kbVectors() { return this.rag.indexedChunks; }
+
+  /**
+   * Live RAG chunk count for a sector badge.
+   * Reads st.docs (updates on ingest/delete) and role ACL (sensitivity visibility).
+   * Touching role()/sensitivity() keeps the template reactive when those change.
+   */
+  chunkCount(k: string): number {
+    void this.st.role();
+    void this.st.sensitivity();
+    const counts = chunkCountsBySector(this.st.docs, s => this.st.canAccess(s));
+    return counts[k] ?? 0;
+  }
 
   pick(k: string) {
     this.st.sector.set(k);

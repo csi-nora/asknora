@@ -2,7 +2,8 @@ import { Injectable } from '@angular/core';
 import { KbDocument, Sensitivity } from '../models';
 import { StateService } from './state.service';
 import { AuditService } from './audit.service';
-import { CorpusAggregatorService } from './corpus-aggregator.service';
+import { RagService }   from './rag.service';
+import { SECTORS, resolveDocSector } from '../data/sectors.data';
 
 const ALLOWED = ['pdf','txt','md','csv','html','htm'];
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -15,11 +16,20 @@ export class DocumentService {
   constructor(
     private state: StateService,
     private audit: AuditService,
-    private corpus: CorpusAggregatorService,
+    private rag:   RagService,
   ) {
-    if (typeof pdfjsLib !== 'undefined') {
+    this._configurePdfWorker();
+  }
+
+  /** Point pdf.js at its web worker. Safe to call repeatedly; no-op if the
+   *  library isn't present yet (we retry lazily right before parsing). */
+  private _configurePdfWorker(): void {
+    if (typeof pdfjsLib !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      // Self-hosted (same origin) so PDF parsing works fully offline / air-gapped.
+      // Resolve against <base href> so it works at root (nginx) and under a
+      // sub-path (GitHub Pages: /asknora/).
       pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        new URL('vendor/pdfjs/pdf.worker.min.js', document.baseURI).href;
     }
   }
 
@@ -33,16 +43,16 @@ export class DocumentService {
       else newDocs.push(result);
     }
 
-    // Full corpus: uploads + local KB + public web + manifest bundles
+    // Index new docs in RAG
     if (newDocs.length > 0) {
-      await this.corpus.reindexFullCorpus();
+      await this.rag.indexDocuments(this.state.docs);
     }
     return errors;
   }
 
   async removeDoc(id: string): Promise<void> {
+    await this.rag.removeDocChunks(id);
     this.state.removeDoc(id);
-    await this.corpus.reindexFullCorpus();
     this.audit.log('Doc Removed', 'Document removed from KB and RAG index', 'internal');
   }
 
@@ -57,6 +67,12 @@ export class DocumentService {
     } catch (e) { return `Failed to read ${file.name}: ${(e as Error).message}`; }
 
     const content = raw.length > MAX_CHARS ? raw.slice(0, MAX_CHARS) + '…[truncated]' : raw;
+    // Stamp the currently selected business sector when set; otherwise infer from
+    // the filename/content so sector badges still get a live RAG chunk count.
+    const selected = this.state.sector();
+    const sector = (selected && SECTORS[selected])
+      ? selected
+      : resolveDocSector({ name: file.name, content, sector: null, businessSector: null });
     const doc: KbDocument = {
       id:         'doc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5),
       name:       file.name,
@@ -67,6 +83,7 @@ export class DocumentService {
       uploadedAt: new Date().toISOString(),
       chunkCount: 0,
       indexed:    false,
+      sector,
     };
     this.state.addDoc(doc);
     this.audit.log('Doc Ingested', `${file.name} (${this.fmtSize(file.size)})`, sensitivity);
@@ -83,7 +100,10 @@ export class DocumentService {
   }
 
   private async _pdfToText(file: File): Promise<string> {
-    if (typeof pdfjsLib === 'undefined') throw new Error('PDF.js not loaded');
+    if (typeof pdfjsLib === 'undefined') {
+      throw new Error('PDF reader unavailable (pdf.js failed to load — check network/CDN access)');
+    }
+    this._configurePdfWorker();
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
     let text = '';

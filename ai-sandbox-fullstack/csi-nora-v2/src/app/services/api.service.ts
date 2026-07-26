@@ -19,6 +19,14 @@ export const PROV_LABEL: Record<ApiProvider, string> = {
   ollama:    'Ollama (Sandbox)',
 };
 
+/** Per-turn token counts from API usage or a char/4 estimate. */
+export interface TokenUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  tokenSource?: 'api' | 'estimate';
+}
+
 export interface ThreatModelStatus {
   framework?: string;
   coverage?: { controls_active: number; controls_total: number; pct: number };
@@ -126,7 +134,17 @@ export class ApiService {
     query:     string,
     sectorKey: string,
     docs:      KbDocument[],
-  ): Promise<{ reply: string; mode: HybridMode; ragChunks: RetrievedChunk[]; guarded?: boolean; guardReason?: string }> {
+  ): Promise<{
+    reply: string;
+    mode: HybridMode;
+    ragChunks: RetrievedChunk[];
+    guarded?: boolean;
+    guardReason?: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    tokenSource?: 'api' | 'estimate';
+  }> {
 
     // Re-probe whenever we're not already CONFIRMED online, so a stale/transient
     // 'offline' never traps the session in Local mode while the stack is actually
@@ -134,7 +152,9 @@ export class ApiService {
     // on every message — but recovery from a hiccup is immediate.
     const online = await this.checkHealth(this.health() !== 'online');
     if (!online) {
-      return { reply: this._localAnswer(query, sectorKey, docs), mode: 'local', ragChunks: [] };
+      const reply = this._localAnswer(query, sectorKey, docs);
+      const usage = this._estimateUsage(query, reply);
+      return { reply, mode: 'local', ragChunks: [], ...usage };
     }
 
     let ragChunks: RetrievedChunk[] = [];
@@ -160,6 +180,7 @@ export class ApiService {
     }));
     history.push({ role: 'user', content: query });
 
+    const promptBlob = [system, ...history.map(m => m.content)].join('\n');
     const prov = this.state.api.provider;
     // Preferred Responsible AI path: route inference through the Nora bridge so
     // server-side output guardrails (+ cloud key rotation) always apply. Falls
@@ -172,17 +193,29 @@ export class ApiService {
         ragChunks,
         guarded: viaBridge.guarded,
         guardReason: viaBridge.guardReason,
+        inputTokens: viaBridge.inputTokens,
+        outputTokens: viaBridge.outputTokens,
+        totalTokens: viaBridge.totalTokens,
+        tokenSource: viaBridge.tokenSource,
       };
     } catch (bridgeErr) {
       console.warn('[API] bridge path unavailable — falling back to direct provider', bridgeErr);
     }
 
     let raw: string;
-    if      (prov === 'anthropic') raw = await this._anthropic(system, history);
-    else if (prov === 'openai' || prov === 'ollama') raw = await this._openaiCompat(prov, system, history);
-    else                           raw = await this._hf(system, history);
+    let usage: TokenUsage;
+    if (prov === 'anthropic') {
+      const r = await this._anthropic(system, history);
+      raw = r.text; usage = r.usage ?? this._estimateUsage(promptBlob, raw);
+    } else if (prov === 'openai' || prov === 'ollama') {
+      const r = await this._openaiCompat(prov, system, history);
+      raw = r.text; usage = r.usage ?? this._estimateUsage(promptBlob, raw);
+    } else {
+      raw = await this._hf(system, history);
+      usage = this._estimateUsage(promptBlob, raw);
+    }
 
-    return { reply: this.guardOutput(raw), mode: 'hybrid', ragChunks };
+    return { reply: this.guardOutput(raw), mode: 'hybrid', ragChunks, ...usage };
   }
 
   /** Guarded inference via `/sandbox/v1/chat/completions` (bridge BFF). */
@@ -190,7 +223,15 @@ export class ApiService {
     prov: ApiProvider,
     system: string,
     messages: { role: string; content: string }[],
-  ): Promise<{ text: string; guarded: boolean; guardReason?: string }> {
+  ): Promise<{
+    text: string;
+    guarded: boolean;
+    guardReason?: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    tokenSource?: 'api' | 'estimate';
+  }> {
     const base = (environment.sandboxBridgeUrl || '/sandbox').replace(/\/$/, '');
     const body: any = {
       model: this.state.api.models[prov],
@@ -218,10 +259,12 @@ export class ApiService {
     const d = await r.json();
     const text = (d.choices?.[0]?.message?.content || '').trim() || 'No response.';
     const nora = d.nora || {};
+    const usage = this._parseUsage(d, system, messages, text, nora.token_source);
     return {
       text,
       guarded: !!nora.guarded,
       guardReason: nora.guard_reason || undefined,
+      ...usage,
     };
   }
 
@@ -259,7 +302,9 @@ export class ApiService {
     return t.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w => w.length>2 && !STOP_WORDS.has(w));
   }
 
-  private async _anthropic(system: string, messages: any[]): Promise<string> {
+  private async _anthropic(
+    system: string, messages: any[],
+  ): Promise<{ text: string; usage?: TokenUsage }> {
     const key = this.state.api.keys['anthropic'];
     const h: any = { 'Content-Type':'application/json' };
     if (key) h['x-api-key'] = key;
@@ -269,11 +314,16 @@ export class ApiService {
     });
     const d = await r.json();
     if (d.error) throw new Error(d.error.message);
-    return d.content?.[0]?.text || 'No response.';
+    const text = d.content?.[0]?.text || 'No response.';
+    const promptBlob = system + '\n' + messages.map((m: any) => m.content || '').join('\n');
+    const usage = this._parseAnthropicUsage(d) ?? this._estimateUsage(promptBlob, text);
+    return { text, usage };
   }
 
   /** OpenAI-compatible chat (cloud OpenAI or local Ollama sandbox) */
-  private async _openaiCompat(prov: 'openai' | 'ollama', system: string, messages: any[]): Promise<string> {
+  private async _openaiCompat(
+    prov: 'openai' | 'ollama', system: string, messages: any[],
+  ): Promise<{ text: string; usage?: TokenUsage }> {
     const key = this.state.api.keys[prov] || (prov === 'ollama' ? 'ollama' : '');
     if (prov === 'openai' && !key) throw new Error('OpenAI API key not set — open API settings.');
     const base = this.openaiCompatBase(prov);
@@ -300,8 +350,9 @@ export class ApiService {
     const d = await r.json();
     if (d.error) throw new Error(typeof d.error === 'string' ? d.error : d.error.message || JSON.stringify(d.error));
     const msg = d.choices?.[0]?.message;
-    const text = (msg?.content || msg?.reasoning_content || '').trim();
-    return text || 'No response.';
+    const text = (msg?.content || msg?.reasoning_content || '').trim() || 'No response.';
+    const usage = this._parseUsage(d, system, messages, text);
+    return { text, usage };
   }
 
   private async _hf(system: string, messages: any[]): Promise<string> {
@@ -317,6 +368,60 @@ export class ApiService {
     const d = await r.json();
     if (d.error) throw new Error(d.error);
     return Array.isArray(d) ? (d[0]?.generated_text||'No response.') : (d.generated_text||JSON.stringify(d));
+  }
+
+  /** Char/4 heuristic — labeled as estimate when API omits usage. */
+  private _estimateTokens(text: string): number {
+    if (!text) return 0;
+    return Math.max(1, Math.ceil(text.length / 4));
+  }
+
+  private _estimateUsage(prompt: string, completion: string): TokenUsage {
+    const inputTokens = this._estimateTokens(prompt);
+    const outputTokens = this._estimateTokens(completion);
+    return {
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
+      tokenSource: 'estimate',
+    };
+  }
+
+  private _parseUsage(
+    d: any,
+    system: string,
+    messages: { role: string; content: string }[],
+    text: string,
+    hintSource?: string,
+  ): TokenUsage {
+    const u = d?.usage;
+    const prompt = u?.prompt_tokens;
+    const completion = u?.completion_tokens;
+    if (typeof prompt === 'number' || typeof completion === 'number') {
+      const inputTokens = Number(prompt || 0);
+      const outputTokens = Number(completion || 0);
+      const totalTokens = typeof u?.total_tokens === 'number'
+        ? u.total_tokens
+        : inputTokens + outputTokens;
+      const source: 'api' | 'estimate' =
+        hintSource === 'estimate' ? 'estimate' : 'api';
+      return { inputTokens, outputTokens, totalTokens, tokenSource: source };
+    }
+    const promptBlob = [system, ...messages.map(m => m.content)].join('\n');
+    return this._estimateUsage(promptBlob, text);
+  }
+
+  private _parseAnthropicUsage(d: any): TokenUsage | null {
+    const u = d?.usage;
+    if (!u || (u.input_tokens == null && u.output_tokens == null)) return null;
+    const inputTokens = Number(u.input_tokens || 0);
+    const outputTokens = Number(u.output_tokens || 0);
+    return {
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
+      tokenSource: 'api',
+    };
   }
 
   shortModel(p: ApiProvider) { return this.state.api.models[p].split('/').pop()?.split('-').slice(0,3).join('-')||''; }

@@ -143,6 +143,7 @@ body::before{content:'';position:fixed;top:-200px;right:-200px;width:600px;heigh
   border-radius:4px;margin-top:5px;font-weight:600;letter-spacing:.03em}
 .mm-hybrid{background:rgba(34,197,94,.1);color:var(--green)}
 .mm-local{background:rgba(245,158,11,.1);color:var(--amber)}
+.mm-guard{background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.25)}
 
 /* ── Save toast ── */
 .save-toast{position:fixed;bottom:20px;right:20px;z-index:9999;background:rgba(34,197,94,.1);

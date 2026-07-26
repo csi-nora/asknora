@@ -33,7 +33,8 @@ export class ChunkerService {
           docId:       doc.id,
           docName:     doc.name,
           content,
-          sensitivity: doc.sensitivity
+          sensitivity: doc.sensitivity,
+          sector:      doc.sector ?? null,
         });
       }
       start = Math.max(start + 1, end - overlap);

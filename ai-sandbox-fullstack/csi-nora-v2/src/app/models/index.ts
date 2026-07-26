@@ -17,6 +17,14 @@ export interface ChatMessage {
   /** True when bridge output guardrails redacted or blocked content (Responsible AI). */
   guarded?:    boolean;
   guardReason?: string;
+  /** Prompt / input tokens for this turn (from API usage or estimate). */
+  inputTokens?:  number;
+  /** Completion / output tokens for this turn. */
+  outputTokens?: number;
+  /** Total tokens when available. */
+  totalTokens?:  number;
+  /** Whether counts came from provider usage or a local estimate. */
+  tokenSource?:  'api' | 'estimate';
 }
 
 export interface KbDocument {
@@ -29,6 +37,10 @@ export interface KbDocument {
   uploadedAt:  string;
   chunkCount:  number;
   indexed:     boolean;
+  /** Business sector key (healthcare, financial, …). Stamped at ingest. */
+  sector?:     string | null;
+  /** Alternate metadata key some exports use; resolved the same as `sector`. */
+  businessSector?: string | null;
 }
 
 export interface TextChunk {
@@ -37,6 +49,8 @@ export interface TextChunk {
   docName:     string;
   content:     string;
   sensitivity: Sensitivity;
+  /** Inherited from parent doc at chunk time (optional for older indexes). */
+  sector?:     string | null;
 }
 
 export interface RetrievedChunk {
@@ -97,7 +111,7 @@ export interface NamedSession {
 
 export interface SectorSvc  { tag: string; color: string; bg: string; }
 export interface Sector {
-  name: string; icon: string; desc: string; count: number;
+  name: string; icon: string; desc: string;
   services: SectorSvc[]; quickPrompts: string[]; context: string;
 }
 

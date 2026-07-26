@@ -8,8 +8,7 @@ import { ApiService }      from '../../services/api.service';
 import { AuditService }    from '../../services/audit.service';
 import { RagService }      from '../../services/rag.service';
 import { EmbeddingService }from '../../services/embedding.service';
-import { ChatHistoryEntry, ChatMessage, RetrievedChunk } from '../../models';
-import { ChatHistoryService } from '../../services/chat-history.service';
+import { ChatMessage, RetrievedChunk } from '../../models';
 import { SECTORS }         from '../../data/sectors.data';
 
 @Component({
@@ -81,10 +80,18 @@ import { SECTORS }         from '../../data/sectors.data';
           </div>
 
           <!-- Mode tag -->
-          <div *ngIf="m.role==='nora' && m.apiMode">
+          <div *ngIf="m.role==='nora' && m.apiMode" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
             <span class="msg-mode-tag" [ngClass]="m.apiMode==='hybrid' ? 'mm-hybrid' : 'mm-local'">
               {{ m.apiMode==='hybrid' ? '🟢 Hybrid RAG · Dense + Sparse + RRF' : '🟡 Local KB' }}
             </span>
+            <span *ngIf="m.guarded" class="msg-mode-tag mm-guard"
+                  [title]="m.guardReason || 'Output guardrails applied'">🛡️ Guardrails applied</span>
+          </div>
+
+          <!-- Per-turn token usage -->
+          <div class="msg-tokens" *ngIf="m.role==='nora' && tokenLabel(m)"
+               [title]="m.tokenSource==='estimate' ? 'Estimated (provider omitted usage)' : 'From API usage'">
+            {{ tokenLabel(m) }}
           </div>
 
           <!-- RAG chunks (expandable) -->
@@ -129,39 +136,6 @@ import { SECTORS }         from '../../data/sectors.data';
     <div *ngFor="let b of banners; trackBy: trackBanner" class="info-banner">{{ b.text }}</div>
 
     <div #bottom></div>
-  </div>
-
-  <!-- Saved Q&A reference (persists across refresh; separate from live transcript) -->
-  <div class="ref-history">
-    <div class="ref-head">
-      <div>
-        <div class="ref-title">Saved reference history</div>
-        <p class="ref-hint">Each reply is stored in this browser (up to 50). Export or copy for your notes.</p>
-      </div>
-      <div class="ref-actions">
-        <button type="button" class="ref-btn" (click)="exportRefJson()" [disabled]="!chatRefEntries.length">Export JSON</button>
-        <button type="button" class="ref-btn ref-btn-danger" (click)="clearRefHistory()" [disabled]="!chatRefEntries.length">Clear all</button>
-      </div>
-    </div>
-    <p class="ref-empty" *ngIf="!chatRefEntries.length">No saved turns yet — send a message above.</p>
-    <ul class="ref-list" *ngIf="chatRefEntries.length">
-      <li *ngFor="let h of chatRefEntries; trackBy: trackRefId" class="ref-item">
-        <details>
-          <summary class="ref-sum">
-            <span class="ref-q">{{ h.query }}</span>
-            <span class="ref-ts">{{ h.at | date:'medium' }}</span>
-          </summary>
-          <div class="ref-body">
-            <div class="ref-src">{{ h.source }}</div>
-            <div class="ref-content">{{ h.content }}</div>
-            <div class="ref-files" *ngIf="h.linkedFiles.length">
-              <span *ngFor="let f of h.linkedFiles" class="ref-chip">📚 {{ f }}</span>
-            </div>
-            <button type="button" class="ref-copy" (click)="copyRefEntry(h); $event.stopPropagation()">Copy Q&amp;A</button>
-          </div>
-        </details>
-      </li>
-    </ul>
   </div>
 
   <!-- Input area -->
@@ -289,29 +263,7 @@ import { SECTORS }         from '../../data/sectors.data';
       &:disabled{opacity:.4;cursor:not-allowed}}
     .info-banner{padding:8px 12px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);
       border-radius:8px;font-size:12px;color:var(--blue);animation:fadeUp .3s ease}
-    .ref-history{border-top:1px solid var(--border);padding:12px 24px 8px;background:rgba(0,0,0,.2);flex-shrink:0;max-height:min(40vh,320px);display:flex;flex-direction:column;min-height:0}
-    .ref-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
-    .ref-title{font-size:11px;font-weight:700;color:var(--text);font-family:var(--fd)}
-    .ref-hint{font-size:9px;color:var(--dim);margin:2px 0 0;max-width:42rem}
-    .ref-actions{display:flex;gap:6px}
-    .ref-btn{font-size:9px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-family:var(--fb)}
-    .ref-btn:hover:not(:disabled){border-color:var(--border-a);color:var(--text)}
-    .ref-btn:disabled{opacity:.4;cursor:not-allowed}
-    .ref-btn-danger{border-color:rgba(224,0,26,.35);color:var(--red)}
-    .ref-empty{font-size:10px;color:var(--dim);font-style:italic;margin:0}
-    .ref-list{list-style:none;margin:0;padding:0;overflow-y:auto;flex:1;min-height:0;display:flex;flex-direction:column;gap:6px}
-    .ref-item{border:1px solid var(--border);border-radius:10px;background:var(--card);overflow:hidden}
-    .ref-sum{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;cursor:pointer;padding:8px 10px;font-size:11px;list-style:none}
-    .ref-sum::-webkit-details-marker{display:none}
-    .ref-q{font-weight:600;color:var(--text)}
-    .ref-ts{font-size:9px;color:var(--dim);font-family:var(--fb)}
-    .ref-body{padding:0 10px 10px;border-top:1px solid var(--border)}
-    .ref-src{font-size:9px;color:var(--amber);margin-top:6px}
-    .ref-content{font-size:11px;color:var(--muted);white-space:pre-wrap;line-height:1.5;margin-top:6px;max-height:180px;overflow-y:auto}
-    .ref-files{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
-    .ref-chip{font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(59,130,246,.1);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
-    .ref-copy{margin-top:8px;font-size:9px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-family:var(--fb)}
-    .ref-copy:hover{border-color:var(--border-a);color:var(--text)}
+    .msg-tokens{margin-top:4px;font-size:10px;color:var(--dim);letter-spacing:.02em;font-variant-numeric:tabular-nums}
   `]
 })
 export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
@@ -332,9 +284,6 @@ export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
   private _scroll = false;
   private _d$ = new Subject<void>();
 
-  /** Persisted query/response pairs for reference (StorageService) */
-  chatRefEntries: ChatHistoryEntry[] = [];
-
   sector = computed(() => this.st.sector());
   quickPrompts = computed(() => this.st.sector() ? SECTORS[this.st.sector()!].quickPrompts : []);
 
@@ -351,11 +300,9 @@ export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
     public embedSvc: EmbeddingService,
     private au: AuditService,
     private san: DomSanitizer,
-    private chatHistory: ChatHistoryService,
   ) {}
 
   ngOnInit() {
-    this.chatRefEntries = this.chatHistory.load();
     this.st.messages$.pipe(takeUntil(this._d$)).subscribe(() => { this._scroll = true; });
   }
   ngAfterViewChecked() {
@@ -393,7 +340,7 @@ export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
 
     if (this.api.isInjection(text)) {
       this._banner('🛡️ Query blocked: prompt injection detected.');
-      this.au.log('BLOCKED', text.slice(0, 40), 'confidential');
+      this.au.log('BLOCKED', text.slice(0,40), 'confidential');
       this.inputText = ''; return;
     }
     if (!this.st.canAccess(this.st.sensitivity())) {
@@ -407,25 +354,37 @@ export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.st.isLoading.set(true);
 
     try {
-      const { reply, mode, ragChunks } = await this.api.send(text, this.st.sector()||'sme', this.st.docs);
+      const { reply, mode, ragChunks, guarded, guardReason,
+              inputTokens, outputTokens, totalTokens, tokenSource } =
+        await this.api.send(text, this.st.sector()||'sme', this.st.docs);
       const sources = ragChunks.length ? [...new Set(ragChunks.map(r=>r.chunk.docName))] : [];
-      this._addMsg({ role:'nora', content: reply, docSources: sources, apiMode: mode, ragChunks });
-      this.chatHistory.append(text, reply, mode, sources, SECTORS[this.st.sector()||'sme'].name);
-      this.chatRefEntries = this.chatHistory.load();
+      this._addMsg({
+        role:'nora', content: reply, docSources: sources, apiMode: mode, ragChunks,
+        guarded, guardReason, inputTokens, outputTokens, totalTokens, tokenSource,
+      });
+      // Keep the mode bar in sync with what actually happened for this message.
+      this.st.hybridMode.set(mode === 'hybrid' ? 'hybrid' : 'local');
       this.au.log(mode==='hybrid'?'Hybrid RAG Response':'Local Response',
                   `${SECTORS[this.st.sector()||'sme'].name} · ${ragChunks.length} chunks`,
                   this.st.sensitivity());
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      const localKb = this.api.localFallbackAnswer(text, this.st.sector()||'sme', this.st.docs);
-      const full =
-        `⚠️ **API error:** ${errMsg}\n\n` +
-        `*If you see "Failed to fetch" or CORS:* set \`backendBaseUrl\` in API Config YAML to **exactly** your app URL (same host/port as the address bar), and run \`npm run gateway\` with \`npm run start:with-gateway\`.\n\n` +
-        `---\n\n**Local KB fallback:**\n\n${localKb}`;
-      this._addMsg({ role:'nora', content: full, apiMode:'local', ragChunks:[] });
-      this.chatHistory.append(text, full, 'local', [], SECTORS[this.st.sector()||'sme'].name);
-      this.chatRefEntries = this.chatHistory.load();
-      this.api.health.set('offline'); this.st.hybridMode.set('local');
+      if (guarded) {
+        this.au.log('Guardrails', guardReason || 'Output guardrails applied', 'confidential');
+      }
+    } catch (err: any) {
+      // A transient LLM/network error must NOT trap the app in Local mode while the
+      // stack is healthy: serve an offline answer for THIS message only, and force a
+      // fresh health probe on the next send so it recovers automatically. We do NOT
+      // pin api.health='offline' (the dedicated /ollama probe + poll own that).
+      const fallback = this.api['_localAnswer']?.(text, this.st.sector()||'sme', this.st.docs) || 'Error: ' + err.message;
+      const content = `⚠️ Couldn't reach the model — showing an offline answer:\n\n${fallback}`;
+      const estIn = Math.max(1, Math.ceil(text.length / 4));
+      const estOut = Math.max(1, Math.ceil(content.length / 4));
+      this._addMsg({
+        role:'nora', content, apiMode:'local', ragChunks:[],
+        inputTokens: estIn, outputTokens: estOut, totalTokens: estIn + estOut, tokenSource: 'estimate',
+      });
+      this.st.hybridMode.set('local');
+      this.api.lastChecked = 0;
     } finally {
       this.st.isLoading.set(false);
     }
@@ -477,33 +436,13 @@ export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
     return this.san.bypassSecurityTrustHtml(h);
   }
   fmtTime(ts: string) { try { return new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); } catch { return ''; } }
+  tokenLabel(m: ChatMessage): string {
+    if (m.inputTokens == null && m.outputTokens == null) return '';
+    const inn = m.inputTokens ?? 0;
+    const out = m.outputTokens ?? 0;
+    const prefix = m.tokenSource === 'estimate' ? '~' : '';
+    return `${prefix}in: ${inn.toLocaleString()} · out: ${out.toLocaleString()}`;
+  }
   trackId  = (_: number, m: ChatMessage) => m.id;
   trackBanner = (_: number, b: {id:number}) => b.id;
-  trackRefId = (_: number, h: ChatHistoryEntry) => h.id;
-
-  clearRefHistory(): void {
-    if (!this.chatRefEntries.length) {
-      return;
-    }
-    if (!confirm('Clear all saved reference history in this browser?')) {
-      return;
-    }
-    this.chatHistory.clear();
-    this.chatRefEntries = [];
-  }
-
-  copyRefEntry(h: ChatHistoryEntry): void {
-    const t = `Query:\n${h.query}\n\nSource: ${h.source}\n\nResponse:\n${h.content}`;
-    void navigator.clipboard?.writeText(t).then(() => this._banner('✓ Copied reference Q&A'));
-  }
-
-  exportRefJson(): void {
-    const blob = new Blob([this.chatHistory.exportJson()], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `csi-nora-chat-reference-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
 }

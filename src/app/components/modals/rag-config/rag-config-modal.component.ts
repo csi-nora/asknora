@@ -5,7 +5,6 @@ import { StateService } from '../../../services/state.service';
 import { RagService }   from '../../../services/rag.service';
 import { EmbeddingService } from '../../../services/embedding.service';
 import { AuditService } from '../../../services/audit.service';
-import { CorpusAggregatorService } from '../../../services/corpus-aggregator.service';
 import { RagConfig, RagMode } from '../../../models';
 
 @Component({
@@ -51,9 +50,9 @@ import { RagConfig, RagMode } from '../../../models';
       <input class="cfg-slider" type="range" [(ngModel)]="cfg.overlap" min="0" max="150" step="10">
     </div>
     <div class="cfg-row">
-      <span class="cfg-lbl">Min score threshold</span>
-      <span class="cfg-val">{{ cfg.minScore.toFixed(2) }}</span>
-      <input class="cfg-slider" type="range" [(ngModel)]="cfg.minScore" min="0.01" max="0.5" step="0.01">
+      <span class="cfg-lbl" title="Applies to the fused RRF score (top hits are ≈0.033). Kept ≤0.02 so a high value can't suppress every citation.">Min score threshold</span>
+      <span class="cfg-val">{{ cfg.minScore.toFixed(3) }}</span>
+      <input class="cfg-slider" type="range" [(ngModel)]="cfg.minScore" min="0" max="0.02" step="0.002">
     </div>
   </div>
 
@@ -112,7 +111,6 @@ export class RagConfigModalComponent {
     public rag: RagService,
     public embedSvc: EmbeddingService,
     private au: AuditService,
-    private corpus: CorpusAggregatorService,
   ) {
     this.cfg = { ...st.ragConfig() };
   }
@@ -125,8 +123,9 @@ export class RagConfigModalComponent {
   }
 
   async reindex() {
-    await this.corpus.reindexFullCorpus();
-    this.au.log('RAG Re-indexed', `${this.rag.totalChunks} chunks (full corpus)`, 'internal');
+    if (!this.st.docs.length) return;
+    await this.rag.indexDocuments(this.st.docs);
+    this.au.log('RAG Re-indexed', `${this.rag.totalChunks} chunks`, 'internal');
   }
 
   close() { this.st.activeModal.set(null); }

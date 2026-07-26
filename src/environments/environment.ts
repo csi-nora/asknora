@@ -1,16 +1,19 @@
-import type { AppEnvironment } from '../app/models';
-
-/** Local development — defaults to sandbox tier; UAT override allowed. */
-export const environment: AppEnvironment = {
+/**
+ * CSI Nora runtime environment.
+ * Local sandbox (ai-ecosystem-sandbox) is reached via Angular proxy in dev
+ * to avoid browser CORS issues with Ollama.
+ */
+export const environment = {
   production: false,
-  deploymentTier: 'sandbox',
-  allowUatOverride: true,
-  appVersion: '4.2.0',
-  /**
-   * Empty + non-production: `RuntimeEnvironmentService` uses `window.location.origin` so
-   * `/api/llm/*` hits the dev proxy → gateway (avoids browser CORS to OpenAI/HF).
-   * Set `backendBaseUrl: ""` in YAML to force direct provider calls from the browser instead.
-   */
-  backendBaseUrl: '',
-  preferTokenBackend: false,
+  /** Default AI provider when no saved config exists */
+  defaultProvider: 'ollama' as const,
+  /** Proxied OpenAI-compatible Ollama API (see proxy.conf.json) */
+  ollamaBaseUrl: '/ollama/v1',
+  /** Direct host URL (docs / production builds without proxy) */
+  ollamaDirectUrl: 'http://localhost:11434/v1',
+  /** Optional sandbox BFF (device scale + guardrails) */
+  sandboxBridgeUrl: '/sandbox',
+  streamlitUrl: 'http://localhost:8501',
+  defaultOllamaModel: 'llama3.2:3b',
+  defaultAccelDevice: 'auto' as const,
 };

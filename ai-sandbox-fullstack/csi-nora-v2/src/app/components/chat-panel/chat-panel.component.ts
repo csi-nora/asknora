@@ -88,6 +88,12 @@ import { SECTORS }         from '../../data/sectors.data';
                   [title]="m.guardReason || 'Output guardrails applied'">🛡️ Guardrails applied</span>
           </div>
 
+          <!-- Per-turn token usage -->
+          <div class="msg-tokens" *ngIf="m.role==='nora' && tokenLabel(m)"
+               [title]="m.tokenSource==='estimate' ? 'Estimated (provider omitted usage)' : 'From API usage'">
+            {{ tokenLabel(m) }}
+          </div>
+
           <!-- RAG chunks (expandable) -->
           <div *ngIf="m.ragChunks?.length">
             <button class="chunks-toggle" (click)="toggle(m.id)">
@@ -257,6 +263,7 @@ import { SECTORS }         from '../../data/sectors.data';
       &:disabled{opacity:.4;cursor:not-allowed}}
     .info-banner{padding:8px 12px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);
       border-radius:8px;font-size:12px;color:var(--blue);animation:fadeUp .3s ease}
+    .msg-tokens{margin-top:4px;font-size:10px;color:var(--dim);letter-spacing:.02em;font-variant-numeric:tabular-nums}
   `]
 })
 export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
@@ -347,9 +354,14 @@ export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.st.isLoading.set(true);
 
     try {
-      const { reply, mode, ragChunks, guarded, guardReason } = await this.api.send(text, this.st.sector()||'sme', this.st.docs);
+      const { reply, mode, ragChunks, guarded, guardReason,
+              inputTokens, outputTokens, totalTokens, tokenSource } =
+        await this.api.send(text, this.st.sector()||'sme', this.st.docs);
       const sources = ragChunks.length ? [...new Set(ragChunks.map(r=>r.chunk.docName))] : [];
-      this._addMsg({ role:'nora', content: reply, docSources: sources, apiMode: mode, ragChunks, guarded, guardReason });
+      this._addMsg({
+        role:'nora', content: reply, docSources: sources, apiMode: mode, ragChunks,
+        guarded, guardReason, inputTokens, outputTokens, totalTokens, tokenSource,
+      });
       // Keep the mode bar in sync with what actually happened for this message.
       this.st.hybridMode.set(mode === 'hybrid' ? 'hybrid' : 'local');
       this.au.log(mode==='hybrid'?'Hybrid RAG Response':'Local Response',
@@ -364,7 +376,13 @@ export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
       // fresh health probe on the next send so it recovers automatically. We do NOT
       // pin api.health='offline' (the dedicated /ollama probe + poll own that).
       const fallback = this.api['_localAnswer']?.(text, this.st.sector()||'sme', this.st.docs) || 'Error: ' + err.message;
-      this._addMsg({ role:'nora', content: `⚠️ Couldn't reach the model — showing an offline answer:\n\n${fallback}`, apiMode:'local', ragChunks:[] });
+      const content = `⚠️ Couldn't reach the model — showing an offline answer:\n\n${fallback}`;
+      const estIn = Math.max(1, Math.ceil(text.length / 4));
+      const estOut = Math.max(1, Math.ceil(content.length / 4));
+      this._addMsg({
+        role:'nora', content, apiMode:'local', ragChunks:[],
+        inputTokens: estIn, outputTokens: estOut, totalTokens: estIn + estOut, tokenSource: 'estimate',
+      });
       this.st.hybridMode.set('local');
       this.api.lastChecked = 0;
     } finally {
@@ -418,6 +436,13 @@ export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
     return this.san.bypassSecurityTrustHtml(h);
   }
   fmtTime(ts: string) { try { return new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); } catch { return ''; } }
+  tokenLabel(m: ChatMessage): string {
+    if (m.inputTokens == null && m.outputTokens == null) return '';
+    const inn = m.inputTokens ?? 0;
+    const out = m.outputTokens ?? 0;
+    const prefix = m.tokenSource === 'estimate' ? '~' : '';
+    return `${prefix}in: ${inn.toLocaleString()} · out: ${out.toLocaleString()}`;
+  }
   trackId  = (_: number, m: ChatMessage) => m.id;
   trackBanner = (_: number, b: {id:number}) => b.id;
 }

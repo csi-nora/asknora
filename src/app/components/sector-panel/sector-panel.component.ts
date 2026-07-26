@@ -5,7 +5,9 @@ import { DocumentService }  from '../../services/document.service';
 import { AuditService }     from '../../services/audit.service';
 import { RagService }       from '../../services/rag.service';
 import { EmbeddingService } from '../../services/embedding.service';
-import { SECTORS, SECTOR_KEYS } from '../../data/sectors.data';
+import { KbStorageService } from '../../services/kb-storage.service';
+import { KbBackendService } from '../../services/kb-backend.service';
+import { SECTORS, SECTOR_KEYS, chunkCountsBySector } from '../../data/sectors.data';
 import { Sensitivity } from '../../models';
 
 @Component({
@@ -18,7 +20,7 @@ import { Sensitivity } from '../../models';
   <button *ngFor="let k of keys" class="sector-btn" [class.active]="st.sector()===k" (click)="pick(k)">
     <span class="si">{{ S[k].icon }}</span>
     <span class="sn">{{ S[k].name }}</span>
-    <span class="sc">{{ S[k].count }}</span>
+    <span class="sc">{{ chunkCount(k) }}</span>
   </button>
 
   <div class="divider"></div>
@@ -35,18 +37,39 @@ import { Sensitivity } from '../../models';
   </div>
 
   <!-- RAG status mini bar -->
-  <div class="rag-mini" *ngIf="rag.totalChunks > 0">
+  <div class="rag-mini" *ngIf="kbChunks > 0 || srv">
+    <div class="rag-mini-row kb-backing"
+         [title]="srv ? 'Knowledge Base is stored on the HOST disk via Qdrant (vectors) + Postgres (registry + full-text). Shared across browsers/devices, and it survives browser clearing AND container/host restarts.' : 'Knowledge Base is stored in THIS browser (localStorage, auto-scaling to IndexedDB). Private to this browser profile. The disk-backed server KB was not reachable.'">
+      <span [style.color]="srv ? 'var(--green)' : 'var(--dim)'">{{ srv ? '🗄️ KB: Server (disk)' : '🌐 KB: Browser' }}</span>
+      <span [style.color]="srv ? 'var(--green)' : 'var(--dim)'">{{ srv ? 'shared ✓' : 'local' }}</span>
+    </div>
     <div class="rag-mini-row">
       <span style="color:var(--blue)">🧠 RAG Index</span>
-      <span style="color:var(--dim)">{{ rag.totalChunks }} chunks</span>
+      <span style="color:var(--dim)">{{ kbChunks }} chunks</span>
     </div>
-    <div *ngIf="rag.indexedChunks > 0" class="rag-mini-row">
+    <div *ngIf="kbVectors > 0" class="rag-mini-row">
       <span style="color:var(--dim)">Dense vectors</span>
-      <span style="color:var(--green)">{{ rag.indexedChunks }} ✓</span>
+      <span style="color:var(--green)">{{ kbVectors }} ✓</span>
+    </div>
+    <div *ngIf="kbVectors > 0 && embedSvc.source()" class="rag-mini-row"
+         [title]="embedSvc.source()==='local' ? 'Embedding model is served from this deployment (works offline / air-gapped).' : 'Embedding model was loaded from the public CDN (requires internet).'">
+      <span style="color:var(--dim)">Model source</span>
+      <span [style.color]="embedSvc.source()==='local' ? 'var(--green)' : 'var(--dim)'">
+        {{ embedSvc.source()==='local' ? 'self-hosted ✓' : 'CDN' }}
+      </span>
     </div>
     <div *ngIf="embedSvc.status()==='loading'" class="embed-progress" style="margin:4px 0;padding:4px 8px">
       <div class="embed-spinner"></div>
       <span>Embedding {{ embedSvc.progress() }}%</span>
+    </div>
+    <div *ngIf="embedSvc.status()==='error'" class="rag-mini-row embed-warn"
+         title="The dense-embedding model couldn't load (no network and no self-hosted assets). Retrieval falls back to keyword-only BM25. Vendor the model with scripts/fetch-embedding-model to enable offline dense search.">
+      <span>⚠️ Keyword-only</span>
+      <span>dense model offline</span>
+    </div>
+    <div *ngIf="kb.overflow() && !srv" class="rag-mini-row kb-overflow" title="KB exceeded the ~5 MB browser storage budget and was automatically moved to the larger persistent store (IndexedDB).">
+      <span>💾 Persistent store</span>
+      <span>IndexedDB{{ kb.persisted() ? ' · pinned' : '' }}</span>
     </div>
   </div>
 
@@ -65,6 +88,12 @@ import { Sensitivity } from '../../models';
     <div class="up-prog-bar" [style.width.%]="upPct()"></div>
   </div>
 
+  <!-- Upload feedback (success / errors — never fail silently) -->
+  <div class="up-msg" [class.err]="feedback()?.err" *ngIf="feedback() as f">
+    <span>{{ f.err ? '⚠️' : '✅' }}</span>
+    <span>{{ f.text }}</span>
+  </div>
+
   <!-- Doc list -->
   <div class="doc-list">
     <div class="no-items" *ngIf="!st.docs.length">No documents ingested yet</div>
@@ -75,8 +104,12 @@ import { Sensitivity } from '../../models';
         <div class="dm">{{ docSvc.fmtSize(d.size) }} · {{ d.type.toUpperCase() }}</div>
         <div class="dm" *ngIf="d.chunkCount">
           {{ d.chunkCount }} chunks
-          <span *ngIf="d.indexed" style="color:var(--green)"> · indexed ✓</span>
-          <span *ngIf="!d.indexed" style="color:var(--amber)"> · BM25 only</span>
+          <span *ngIf="d.indexed" style="color:var(--green)"
+                title="Dense embeddings (MiniLM) + BM25 keyword search are both active for this document (hybrid retrieval).">
+            · dense + BM25 ✓</span>
+          <span *ngIf="!d.indexed" style="color:var(--amber);cursor:help"
+                title="Dense embeddings didn't load — the app couldn't reach the embedding model (offline / CDN blocked) and no self-hosted copy was found, so this document is searched with keyword BM25 only. Run scripts/fetch-embedding-model once to vendor the model for offline dense vectors.">
+            · BM25 only ⓘ</span>
         </div>
         <span class="si" [ngClass]="'si-'+d.sensitivity">{{ d.sensitivity.toUpperCase() }}</span>
       </div>
@@ -106,11 +139,18 @@ import { Sensitivity } from '../../models';
     .rag-mini{padding:6px 8px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);
       border-radius:8px;font-size:10px;margin:2px 0}
     .rag-mini-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+    .kb-backing{margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid rgba(59,130,246,.15);font-weight:600}
+    .kb-overflow{margin-top:4px;padding-top:4px;border-top:1px solid rgba(59,130,246,.15);color:var(--green)}
+    .embed-warn{margin-top:4px;padding-top:4px;border-top:1px solid rgba(245,158,11,.2);color:var(--amber);cursor:help}
     .upload-zone{border:1.5px dashed var(--border);border-radius:10px;padding:12px;text-align:center;
       cursor:pointer;transition:.2s;margin:4px 0;
       &:hover,.dragover{border-color:var(--border-a);background:rgba(224,0,26,.04)}}
     .uz-text{font-size:11px;color:var(--muted);line-height:1.5 strong{color:var(--text);display:block;font-size:12px}}
     .uz-text strong{color:var(--text);display:block;font-size:12px}
+    .up-msg{display:flex;align-items:flex-start;gap:6px;font-size:10px;line-height:1.4;
+      padding:6px 8px;border-radius:8px;margin:2px 0;
+      background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);color:var(--green)}
+    .up-msg.err{background:rgba(224,0,26,.08);border-color:rgba(224,0,26,.3);color:var(--red)}
     .doc-list{display:flex;flex-direction:column;gap:4px}
     .doc-item{display:flex;align-items:flex-start;gap:7px;padding:7px 8px;background:var(--surface);
       border:1px solid var(--border);border-radius:8px;font-size:11px;transition:.15s;
@@ -133,6 +173,7 @@ export class SectorPanelComponent {
   uploading = signal(false);
   upPct     = signal(0);
   over = this._over;
+  feedback = signal<{ text: string; err: boolean } | null>(null);
 
   constructor(
     public st:  StateService,
@@ -140,7 +181,27 @@ export class SectorPanelComponent {
     private au: AuditService,
     public rag: RagService,
     public embedSvc: EmbeddingService,
+    public kb: KbStorageService,
+    public kbBackend: KbBackendService,
   ) {}
+
+  /** True when the disk-backed server KB (bridge) is the active backing. */
+  get srv() { return this.kbBackend.isServer; }
+  /** Chunk/vector counts from the active backing (rag getters are server-aware). */
+  get kbChunks()  { return this.rag.totalChunks; }
+  get kbVectors() { return this.rag.indexedChunks; }
+
+  /**
+   * Live RAG chunk count for a sector badge.
+   * Reads st.docs (updates on ingest/delete) and role ACL (sensitivity visibility).
+   * Touching role()/sensitivity() keeps the template reactive when those change.
+   */
+  chunkCount(k: string): number {
+    void this.st.role();
+    void this.st.sensitivity();
+    const counts = chunkCountsBySector(this.st.docs, s => this.st.canAccess(s));
+    return counts[k] ?? 0;
+  }
 
   pick(k: string) {
     this.st.sector.set(k);
@@ -161,9 +222,23 @@ export class SectorPanelComponent {
     if (e.dataTransfer?.files) this._ingest(e.dataTransfer.files);
   }
   private async _ingest(files: FileList) {
+    this.feedback.set(null);
     this.uploading.set(true); this.upPct.set(20);
-    await this.docSvc.ingestFiles(files, this.st.sensitivity());
+    let errors: string[] = [];
+    try {
+      errors = await this.docSvc.ingestFiles(files, this.st.sensitivity());
+    } catch (e) {
+      errors = [(e as Error)?.message || 'Unexpected error during ingestion'];
+    }
     this.upPct.set(100);
+    const total = files.length;
+    const ok = total - errors.length;
+    if (errors.length) {
+      this.feedback.set({ text: `${ok}/${total} added — ${errors.join('; ')}`, err: true });
+    } else if (ok > 0) {
+      this.feedback.set({ text: `${ok} document${ok !== 1 ? 's' : ''} added to the knowledge base.`, err: false });
+      setTimeout(() => this.feedback.set(null), 4000);
+    }
     setTimeout(() => { this.uploading.set(false); this.upPct.set(0); }, 500);
   }
   remove(id: string) { this.docSvc.removeDoc(id); }

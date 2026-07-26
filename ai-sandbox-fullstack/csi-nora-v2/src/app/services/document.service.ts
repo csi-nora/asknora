@@ -3,6 +3,7 @@ import { KbDocument, Sensitivity } from '../models';
 import { StateService } from './state.service';
 import { AuditService } from './audit.service';
 import { RagService }   from './rag.service';
+import { SECTORS, resolveDocSector } from '../data/sectors.data';
 
 const ALLOWED = ['pdf','txt','md','csv','html','htm'];
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -66,6 +67,12 @@ export class DocumentService {
     } catch (e) { return `Failed to read ${file.name}: ${(e as Error).message}`; }
 
     const content = raw.length > MAX_CHARS ? raw.slice(0, MAX_CHARS) + '…[truncated]' : raw;
+    // Stamp the currently selected business sector when set; otherwise infer from
+    // the filename/content so sector badges still get a live RAG chunk count.
+    const selected = this.state.sector();
+    const sector = (selected && SECTORS[selected])
+      ? selected
+      : resolveDocSector({ name: file.name, content, sector: null, businessSector: null });
     const doc: KbDocument = {
       id:         'doc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5),
       name:       file.name,
@@ -76,6 +83,7 @@ export class DocumentService {
       uploadedAt: new Date().toISOString(),
       chunkCount: 0,
       indexed:    false,
+      sector,
     };
     this.state.addDoc(doc);
     this.audit.log('Doc Ingested', `${file.name} (${this.fmtSize(file.size)})`, sensitivity);

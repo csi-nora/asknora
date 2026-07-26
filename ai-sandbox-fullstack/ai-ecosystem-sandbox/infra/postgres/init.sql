@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS kb.documents (
     content     TEXT DEFAULT '',
     chunk_count INT  DEFAULT 0,
     indexed     BOOLEAN DEFAULT FALSE,
-    uploaded_at TIMESTAMPTZ DEFAULT NOW()
+    uploaded_at TIMESTAMPTZ DEFAULT NOW(),
+    sector      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS kb.chunks (
@@ -60,6 +61,7 @@ CREATE TABLE IF NOT EXISTS kb.chunks (
     doc_name    TEXT,
     content     TEXT NOT NULL,
     sensitivity TEXT DEFAULT 'internal',
+    sector      TEXT,
     tsv         TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
 );
 

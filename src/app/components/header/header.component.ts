@@ -1,9 +1,7 @@
 import { Component, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule }  from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { StateService } from '../../services/state.service';
-import { DeploymentEnvironmentService } from '../../services/deployment-environment.service';
 import { ApiService, PROV_COLOR, PROV_LABEL } from '../../services/api.service';
 import { StorageService } from '../../services/storage.service';
 import { AuditService }   from '../../services/audit.service';
@@ -25,27 +23,6 @@ import { RagService }     from '../../services/rag.service';
 
   <div class="hdr-right">
     <div class="security-badge"><div class="dot"></div>Secure Session</div>
-
-    <!-- Deployment tier (sandbox / production) -->
-    <div
-      class="tier-badge"
-      [ngClass]="deploy.isProduction() ? 'tier-prod' : 'tier-sbx'"
-      [title]="deploy.tierSummary() + ' · v' + deploy.buildEnvironment.appVersion"
-    >
-      {{ deploy.tierLabel() }}
-    </div>
-    <div class="uat-tier" *ngIf="deploy.buildEnvironment.allowUatOverride">
-      <span class="uat-lbl">UAT</span>
-      <select
-        class="uat-sel"
-        [ngModel]="deploy.tier()"
-        (ngModelChange)="onUatTierChange($event)"
-      >
-        <option value="sandbox">Sandbox</option>
-        <option value="production">Production</option>
-      </select>
-      <button type="button" class="uat-reset" (click)="deploy.clearUatOverride()" title="Reset to build default">↺</button>
-    </div>
 
     <!-- Hybrid mode badge -->
     <div class="mode-badge" [ngClass]="modeCls()">
@@ -85,9 +62,6 @@ import { RagService }     from '../../services/rag.service';
     .hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;
       background:rgba(10,10,15,.97);border-bottom:1px solid var(--border);
       position:sticky;top:0;z-index:200;backdrop-filter:blur(12px);gap:12px;height:62px}
-    .hdr-launcher{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;
-      color:var(--muted);text-decoration:none;font-size:16px;border:1px solid var(--border);flex-shrink:0}
-    .hdr-launcher:hover{color:var(--red);border-color:var(--red)}
     .logo-area{display:flex;align-items:center;gap:12px;flex-shrink:0}
     .logo-badge{width:36px;height:36px;background:linear-gradient(135deg,var(--red),var(--red-deep));
       border-radius:10px;display:flex;align-items:center;justify-content:center;
@@ -119,28 +93,12 @@ import { RagService }     from '../../services/rag.service';
     .hdr-btn{padding:5px 9px;border-radius:8px;border:1px solid var(--border);background:var(--card);
       color:var(--muted);font-size:11px;cursor:pointer;transition:.15s;white-space:nowrap;font-family:var(--fb);
       &:hover{border-color:var(--border-a);color:var(--text)} &.danger:hover{border-color:rgba(224,0,26,.5);color:var(--red)}}
-    .tier-badge{font-size:10px;font-weight:800;letter-spacing:.06em;padding:4px 8px;border-radius:6px;font-family:var(--fd);
-      white-space:nowrap}
-    .tier-badge.tier-sbx{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:#fbbf24}
-    .tier-badge.tier-prod{background:rgba(224,0,26,.15);border:1px solid rgba(224,0,26,.45);color:var(--red)}
-    .uat-tier{display:flex;align-items:center;gap:4px;padding:2px 6px;border-radius:8px;border:1px dashed var(--border);
-      background:rgba(255,255,255,.03)}
-    .uat-lbl{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
-    .uat-sel{font-size:10px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 4px;max-width:110px}
-    .uat-reset{font-size:11px;line-height:1;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;
-      &:hover{color:var(--text)}}
   `]
 })
 export class HeaderComponent {
   roles = ['engineer','support','sales','manager','executive'];
-  constructor(
-    public st: StateService,
-    public api: ApiService,
-    public deploy: DeploymentEnvironmentService,
-    private ss: StorageService,
-    private au: AuditService,
-    public rag: RagService,
-  ) {}
+  constructor(public st: StateService, public api: ApiService,
+              private ss: StorageService, private au: AuditService, public rag: RagService) {}
 
   get role() { return this.st.role(); }
   set role(v: any) { this.st.role.set(v); this.au.log('Role Changed', v, 'internal'); }
@@ -148,12 +106,6 @@ export class HeaderComponent {
   modeCls()   { const m = this.st.hybridMode(); return m === 'hybrid' ? 'm-hybrid' : m === 'local' ? 'm-local' : 'm-checking'; }
   modeDot()   { const m = this.st.hybridMode(); return m === 'hybrid' ? 'md-hybrid' : m === 'local' ? 'md-local' : 'md-checking'; }
   modeLabel() { const m = this.st.hybridMode(); return m === 'hybrid' ? '🟢 Hybrid RAG' : m === 'local' ? '🟡 Local Mode' : '🔄 Checking…'; }
-
-  onUatTierChange(v: string): void {
-    if (v === 'sandbox' || v === 'production') {
-      this.deploy.setUatTier(v);
-    }
-  }
 
   clearAll() {
     if (!confirm('Clear all messages and documents?')) return;
