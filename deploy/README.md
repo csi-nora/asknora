@@ -2,7 +2,8 @@
 
 | Document | Purpose |
 |----------|---------|
-| **[../DEPLOY-PRODUCTION.md](../DEPLOY-PRODUCTION.md)** | **Start here** — Docker, Node prod, release bundle, Netlify |
+| **[ubuntu-laptop/README.md](./ubuntu-laptop/README.md)** | **Local Ubuntu laptop demo** — `npm run demo` → `http://localhost:8080` |
+| **[../DEPLOY-PRODUCTION.md](../DEPLOY-PRODUCTION.md)** | Docker, Node prod, release bundle, Netlify |
 | **[OPERATIONS-RUNBOOK.md](./OPERATIONS-RUNBOOK.md)** | AWS, sovereign cloud, on-prem runbooks |
 | **[docker/](./docker/)** | Production Docker Compose (web + API gateway) |
 | **[../docs/ARCHITECTURE-LOCAL-LLM-ON-PREM.md](../docs/ARCHITECTURE-LOCAL-LLM-ON-PREM.md)** | On‑prem local LLM architecture (hardware, GPU/CPU/NPU, serving stack, RAG, egress) — **canonical**; `deploy/ARCHITECTURE-*.md` redirects here |
