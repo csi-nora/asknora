@@ -56,6 +56,18 @@ The Nora bridge (`/sandbox`) is the **guarded inference path**:
 
 Smoke: `python apps/nora_bridge/smoke_rai.py` (add `--live` against a running stack).
 
+## Agentic AI Threat Model — 12-Layer (STRIDE + Process)
+
+Mapped from the industry Agentic AI threat-modeling framework onto Nora:
+
+- **L1–L6 STRIDE** — Spoofing, Tampering, Repudiation, Information Disclosure, DoS, Elevation
+- **L7–L12 Process** — Define Scope → Map Architecture → Identify Threats → Assess Risks → Define Controls → Monitor & Iterate
+
+Live catalog + coverage: `GET /sandbox/threat-model`  
+UI: right panel **🛡️ STRIDE · 12-Layer**  
+Full write-up: `docs/Agentic-AI-STRIDE-Threat-Model.md`  
+MCP tool gate (`MCP_TOOL_GATE=true`) limits payload size / injection patterns on calculator, web_search, wikipedia_lookup.
+
 ## Routing map
 
 | Path                 | Target (prod)                 | Notes                                    |

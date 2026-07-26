@@ -19,6 +19,18 @@ export const PROV_LABEL: Record<ApiProvider, string> = {
   ollama:    'Ollama (Sandbox)',
 };
 
+export interface ThreatModelStatus {
+  framework?: string;
+  coverage?: { controls_active: number; controls_total: number; pct: number };
+  stride_layers?: Array<{
+    id: string; layer: number; name: string; covered: boolean;
+    controls?: Array<{ id: string; name: string; active: boolean }>;
+  }>;
+  process_layers?: Array<{ id: string; layer: number; name: string }>;
+  trust_boundaries?: string[];
+  guardrails?: { enabled?: boolean; presidio?: { active?: boolean } };
+}
+
 const INJECTION_RE = [
   /ignore.*(?:previous|above|all).*instruction/i,
   /reveal.*all.*data/i,
@@ -45,6 +57,23 @@ export class ApiService {
 
   get hybridMode(): HybridMode {
     return this.health() === 'online' ? 'hybrid' : this.health() === 'offline' ? 'local' : 'checking';
+  }
+
+  /** Agentic AI 12-layer STRIDE threat model (bridge). */
+  threatModel = signal<ThreatModelStatus | null>(null);
+
+  async refreshThreatModel(): Promise<ThreatModelStatus | null> {
+    const base = (environment.sandboxBridgeUrl || '/sandbox').replace(/\/$/, '');
+    try {
+      const r = await fetch(`${base}/threat-model`, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) { this.threatModel.set(null); return null; }
+      const data = await r.json() as ThreatModelStatus;
+      this.threatModel.set(data);
+      return data;
+    } catch {
+      this.threatModel.set(null);
+      return null;
+    }
   }
 
   /** Resolve OpenAI-compatible base URL for openai / ollama */

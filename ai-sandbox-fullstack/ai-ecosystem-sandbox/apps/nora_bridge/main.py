@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT))
 from src.providers.device import apply_accel_env, ollama_num_gpu, resolve_device, status_report
 from src.providers.guardrails import guard_input, guard_output, status_report as guardrails_status
 from src.providers.key_pool import get_key_pool, mask_key
+from src.providers.threat_model import framework_status, map_guard_action_to_stride
 from apps.nora_bridge.kb import router as kb_router, ensure_ready as kb_ensure_ready
 
 OLLAMA = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
@@ -36,7 +37,7 @@ DEFAULT_OPENAI_MODEL = os.getenv("LLM_MODEL_OPENAI", "gpt-4o-mini")
 DEFAULT_ANTHROPIC_MODEL = os.getenv("LLM_MODEL_ANTHROPIC", "claude-3-5-haiku-20241022")
 DEFAULT_HF_MODEL = os.getenv("LLM_MODEL_HF", "mistralai/Mistral-7B-Instruct-v0.2")
 
-app = FastAPI(title="CSI Nora Sandbox Bridge", version="1.2.0")
+app = FastAPI(title="CSI Nora Sandbox Bridge", version="1.3.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:4200", "http://127.0.0.1:4200", "*"],
@@ -132,11 +133,23 @@ def guardrails_status_endpoint() -> dict[str, Any]:
     return {
         "guardrails": guardrails_status(),
         "key_pools": get_key_pool().status(),
+        "threat_model": {
+            "framework": "Agentic AI 12-Layer (STRIDE + Process)",
+            "coverage": framework_status()["coverage"],
+            "endpoint": "/threat-model",
+        },
         "notes": {
             "ollama": "Local Ollama needs no API keys; output guardrails still apply on the bridge path.",
             "rotation": "Cloud keys rotate on HTTP 401/403/429. Set OPENAI_API_KEYS=k1,k2 (etc).",
+            "stride": "Full 12-layer catalog: GET /sandbox/threat-model",
         },
     }
+
+
+@app.get("/threat-model")
+def threat_model_endpoint() -> dict[str, Any]:
+    """Agentic AI STRIDE + 6-step process (12 layers) with live control coverage."""
+    return framework_status()
 
 
 @app.get("/v1/devices")

@@ -40,6 +40,16 @@ def test_guardrails_unit() -> None:
     assert st["presidio"]["enabled"] is False
     print("  OK  presidio toggle status:", st["presidio"])
 
+    # 12-layer threat model catalog
+    from src.providers.threat_model import framework_status, map_guard_action_to_stride
+    fw = framework_status()
+    assert fw["layers_total"] == 12
+    assert len(fw["stride_layers"]) == 6
+    assert len(fw["process_layers"]) == 6
+    assert fw["coverage"]["controls_total"] > 0
+    assert "T" in map_guard_action_to_stride("input_injection_blocked")
+    print("  OK  12-layer threat model:", fw["coverage"])
+
     # Policy leak blocked
     gpol = guard_output("Here is the pricing confidential sheet for the customer.")
     assert not gpol.allowed, gpol

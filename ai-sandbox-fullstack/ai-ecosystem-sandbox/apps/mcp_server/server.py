@@ -33,6 +33,7 @@ if _SANDBOX_ROOT not in sys.path:
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from src.providers import tool_impls  # noqa: E402
+from src.providers.mcp_gate import guarded  # noqa: E402
 
 mcp = FastMCP(
     "csi-nora-tools",
@@ -44,19 +45,19 @@ mcp = FastMCP(
 @mcp.tool()
 def calculator(expression: str) -> str:
     """Evaluate a basic arithmetic expression, e.g. "(2+3)*4"."""
-    return tool_impls.calculator(expression)
+    return guarded(tool_impls.calculator, expression=expression)
 
 
 @mcp.tool()
 def web_search(query: str) -> str:
     """Search DuckDuckGo for recent web results (returns the top 3)."""
-    return tool_impls.web_search(query)
+    return guarded(tool_impls.web_search, query=query)
 
 
 @mcp.tool()
 def wikipedia_lookup(topic: str) -> str:
     """Return a short (3-sentence) English Wikipedia summary for a topic."""
-    return tool_impls.wikipedia_lookup(topic)
+    return guarded(tool_impls.wikipedia_lookup, topic=topic)
 
 
 def _build_sse_app(base_path: str):

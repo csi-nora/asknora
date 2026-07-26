@@ -1,4 +1,4 @@
-import { Component, computed } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule, TitleCasePipe } from '@angular/common';
 import { StateService }  from '../../services/state.service';
 import { StorageService } from '../../services/storage.service';
@@ -18,16 +18,53 @@ import { SECTORS }        from '../../data/sectors.data';
   <!-- Security -->
   <div class="info-section">
     <div class="info-title">🔐 Security Status</div>
-    <div class="sec-item"><span class="sec-label">IAM Auth</span>
-      <div class="sec-status"><div class="status-dot" style="background:var(--green);box-shadow:0 0 6px rgba(34,197,94,.5)"></div><span style="color:var(--green)">Active</span></div></div>
-    <div class="sec-item"><span class="sec-label">Role Filter</span>
-      <div class="sec-status"><div class="status-dot" style="background:var(--green)"></div><span style="color:var(--green)">{{ st.role() }}</span></div></div>
+    <div class="sec-item"><span class="sec-label">IAM / Role ACL</span>
+      <div class="sec-status"><div class="status-dot" style="background:var(--green)"></div>
+        <span style="color:var(--green)">{{ st.role() }} · {{ clearanceLabel() }}</span></div></div>
     <div class="sec-item"><span class="sec-label">Output Guard</span>
-      <div class="sec-status"><div class="status-dot" style="background:var(--green)"></div><span style="color:var(--green)">Active</span></div></div>
+      <div class="sec-status"><div class="status-dot" [style.background]="guardDot()"></div>
+        <span [style.color]="guardColor()">{{ guardLabel() }}</span></div></div>
+    <div class="sec-item"><span class="sec-label">Presidio</span>
+      <div class="sec-status"><div class="status-dot" [style.background]="presidioDot()"></div>
+        <span>{{ presidioLabel() }}</span></div></div>
     <div class="sec-item"><span class="sec-label">Provider</span>
       <div class="sec-status"><div class="status-dot" [style.background]="provColor()"></div><span>{{ provLabel() }}</span></div></div>
     <div class="sec-item"><span class="sec-label">Mode</span>
-      <div class="sec-status"><div class="status-dot" [style.background]="modeDot()"></div><span [style.color]="modeColor()">{{ st.hybridMode() | titlecase }}</span></div></div>
+      <div class="sec-status"><div class="status-dot" [style.background]="modeDot()"></div>
+        <span [style.color]="modeColor()">{{ st.hybridMode() | titlecase }}</span></div></div>
+  </div>
+
+  <!-- Agentic AI 12-layer STRIDE -->
+  <div class="info-section">
+    <div class="info-title">🛡️ STRIDE · 12-Layer
+      <button class="btn-sm" (click)="refreshThreat()">Refresh</button>
+    </div>
+    <div *ngIf="!tm()" style="font-size:10px;color:var(--amber);padding:4px 0">
+      Bridge offline — threat-model status unavailable (degraded RAI path).
+    </div>
+    <ng-container *ngIf="tm() as t">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">
+        {{ t.framework || 'Agentic AI Threat Model' }}
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
+        <span style="color:var(--muted)">Control coverage</span>
+        <span style="color:var(--green);font-weight:600">{{ t.coverage?.pct ?? 0 }}%</span>
+      </div>
+      <div class="storage-bar-wrap" style="margin-bottom:8px">
+        <div class="storage-bar s-ok" [style.width.%]="t.coverage?.pct || 0"></div>
+      </div>
+      <div class="stride-grid">
+        <div class="stride-chip" *ngFor="let s of t.stride_layers || []"
+             [class.ok]="s.covered" [class.warn]="!s.covered"
+             [title]="s.name">
+          <span class="sid">{{ s.id }}</span>
+          <span class="sname">L{{ s.layer }}</span>
+        </div>
+      </div>
+      <div style="font-size:9px;color:var(--dim);margin-top:6px;line-height:1.4">
+        L1–L6 STRIDE · L7–L12 process (scope→monitor). Trust: User↔Agent↔Tools↔Memory↔External.
+      </div>
+    </ng-container>
   </div>
 
   <!-- RAG Stats -->
@@ -126,7 +163,13 @@ import { SECTORS }        from '../../data/sectors.data';
   `,
   styles: [`:host{display:contents}
     .ip{border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;
-      &::-webkit-scrollbar{width:3px}&::-webkit-scrollbar-thumb{background:var(--border)}}`]
+      &::-webkit-scrollbar{width:3px}&::-webkit-scrollbar-thumb{background:var(--border)}}
+    .stride-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+    .stride-chip{border:1px solid var(--border);border-radius:6px;padding:4px 6px;display:flex;justify-content:space-between;align-items:center;font-size:10px}
+    .stride-chip.ok{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.08)}
+    .stride-chip.warn{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.08)}
+    .stride-chip .sid{font-weight:700;color:var(--text)}
+    .stride-chip .sname{color:var(--dim)}`]
 })
 export class InfoPanelComponent {
   constructor(
@@ -136,7 +179,36 @@ export class InfoPanelComponent {
     private apiSvc: ApiService,
     public rag: RagService,
     public embedSvc: EmbeddingService,
-  ) {}
+  ) {
+    this.apiSvc.refreshThreatModel();
+    setInterval(() => this.apiSvc.refreshThreatModel(), 60_000);
+  }
+
+  tm = () => this.apiSvc.threatModel();
+
+  clearanceLabel() {
+    const acl = this.st.ROLE_ACL[this.st.role()] || [];
+    return acl.join('+');
+  }
+  guardLabel() {
+    const g = this.tm()?.guardrails;
+    if (!this.tm()) return this.st.hybridMode() === 'hybrid' ? 'Bridge path' : 'Degraded';
+    return g?.enabled ? 'Active' : 'Off';
+  }
+  guardDot() {
+    if (!this.tm()) return 'var(--amber)';
+    return this.tm()?.guardrails?.enabled ? 'var(--green)' : 'var(--amber)';
+  }
+  guardColor() { return this.guardDot(); }
+  presidioLabel() {
+    const p = this.tm()?.guardrails?.presidio;
+    if (!this.tm()) return '—';
+    return p?.active ? 'On' : 'Off';
+  }
+  presidioDot() {
+    return this.tm()?.guardrails?.presidio?.active ? 'var(--green)' : 'var(--dim)';
+  }
+  refreshThreat() { this.apiSvc.refreshThreatModel(); this.au.log('Threat Model', 'Refreshed 12-layer STRIDE status', this.st.sensitivity()); }
 
   sectorLabel() {
     const s = this.st.sector();
