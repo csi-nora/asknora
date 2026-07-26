@@ -1,0 +1,12 @@
+{
+  "name": "csi-nora-demo-5min",
+  "private": true,
+  "description": "5-slide animated deck + 5-minute demo video renderer",
+  "scripts": {
+    "record": "node record-demo.cjs",
+    "open": "start index.html"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}

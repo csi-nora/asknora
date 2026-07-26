@@ -1,0 +1,6 @@
+node_modules/
+output/frames/
+output/*.txt
+output/s*_*.mp4
+output/broll.mp4
+package-lock.json
